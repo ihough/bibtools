@@ -1,0 +1,10 @@
+name: bibtools
+channels:
+- conda-forge
+dependencies:
+- google-auth
+- gspread
+- pandas
+- python=3.12
+- pyyaml
+- requests

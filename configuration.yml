@@ -1,0 +1,12 @@
+# Tool configuration
+
+# Path to the authentication key for your Google Cloud project service account
+service_account_key: REDACTED
+
+# URL of the Google Sheet listing the papers
+# The sheet must be shared with 'Anyone with the link can access' permissions
+sheet_url: null
+
+# Scopes for Google Sheets API access. You shouldn't need to modify these.
+scope_sheets_read: https://www.googleapis.com/auth/spreadsheets.readonly
+scope_sheets_write: https://www.googleapis.com/auth/spreadsheets
