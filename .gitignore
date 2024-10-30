@@ -1,2 +1,6 @@
+# Authentication keys
 keys/
+
+# Output files
 papers.csv
+references.bib

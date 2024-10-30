@@ -1,39 +1,61 @@
 #!/usr/bin/env python
-#
-# requires the following installations :
-#
-# pip install gspread google-auth
+
+"""Update Google Sheet with paper bibliographic details from a CSV"""
+
+import argparse
+import logging
+
+from utils import read_csv, get_sheet
 
 
-import gspread
-import pandas as pd
-from google.oauth2.service_account import Credentials
+logger = logging.getLogger(__name__)
 
-# 1. Path to your downloaded service account key file (the JSON file)
-SERVICE_ACCOUNT_FILE = 'REDACTED'
 
-# 2. Define the scope required for Google Sheets
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+def csv2sheets():
+    """Update Google Sheet with paper bibliographic details from a CSV"""
 
-# 3. Authenticate with the service account
-creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-client = gspread.authorize(creds)
+    # Read papers from the CSV
+    papers = read_csv()
+    if not any(papers):
+        raise ValueError("No papers found in CSV")
 
-# 4. Open the Google Sheet by its URL or spreadsheet ID
-SHEET_URL = 'REDACTED'
-sheet = client.open_by_url(SHEET_URL).sheet1  # Access the first sheet
+    # Convert DOI and HAL ID to links
+    papers["DOI link"] = papers["DOI"].apply(
+        lambda doi: doi if doi == "no doi" else f"https://doi.org/{doi}"
+    )
+    papers["HAL link"] = papers["HAL ID"].apply(
+        lambda id: id if id == "no hal id" else f"https://hal.science/{id}"
+    )
 
-# 5. Read the CSV file using pandas
-csv_file = './papers.csv'
-df = pd.read_csv(csv_file)
+    # Convert first/corresponding author from True/False to Yes/No
+    papers["Is a team member the first or corresponding author?"] = papers[
+        "Is a team member the first or corresponding author?"
+    ].apply(lambda x: "Yes" if x else "No")
 
-# 6. Clear existing content in the sheet (optional)
-sheet.clear()
+    # Clear the Google Sheet except the first two rows (titles + headers)
+    sheet = get_sheet(write=True)
+    titles = sheet.row_values(1)
+    headers = sheet.row_values(2)
+    sheet.clear()
+    sheet.update(values=[titles, headers], range_name="A1")
 
-# 7. Update the Google Sheet with the data from the CSV
-# Convert the dataframe to a list of lists (values) to be inserted into the sheet
-sheet_data = [df.columns.values.tolist()] + df.values.tolist()  # Include headers
-sheet.update(sheet_data)
+    # Write paper details
+    sheet.update(values=papers[headers].values.tolist(), range_name="A3")
 
-print("Google Sheet updated successfully!")
+    logger.info("Updated %s", sheet.url)
 
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="display DEBUG level messages"
+    )
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.DEBUG if args.verbose else logging.INFO,
+    )
+
+    csv2sheets()

@@ -1,173 +1,125 @@
 #!/usr/bin/env python
 
+"""Read papers from Google Sheet, lookup bibliographic details, and write to CSV"""
+
+import argparse
 import csv
-import re
 import logging
 from pathlib import Path
-from warnings import warn
 
-import gspread
-import requests
-from google.oauth2.service_account import Credentials
-
-from configure import CONFIG
+from utils import get_sheet_papers
 
 
 logger = logging.getLogger(__name__)
 
 
-def validate_layout(sheet: gspread.Worksheet) -> None:
-    """Confirm the sheet has the expected layout
+def sheets2csv(force: bool = False, no_lookup: bool = False) -> None:
+    """Read papers from Google Sheet, lookup bibliographic details, and write to CSV"""
 
-    Row 2 must contain column headers. Column B must contain DOIs.
-    """
+    csv_path = Path("papers.csv")
+    if csv_path.exists() and not force:
+        raise ValueError(f"File exists: {csv_path}. Use --force to overwrite.")
 
-    b2 = sheet.get_values("B2")[0][0]
-    if b2.lower().strip() != "doi link":
-        msg = (
-            "Unrecognized sheet layout."
-            + "\nRow 2 should contain column headers and column B should contain DOIs."
-            + f"\nCell B2 should contain 'DOI link'; got '{b2}'."
-        )
-        raise ValueError(msg)
+    # Read deduplicated papers from the Google Sheet
+    papers = get_sheet_papers()
+    if not any(papers):
+        raise ValueError("No papers found in Google Sheet")
 
-
-def parse_doi_links(doi_links: list[str]) -> list[str]:
-    """Standardize a list of DOI URLs
-
-    Standardized format: https://doi.org/[doi]
-
-    Recognized formats:
-    * http[s]://[dx.]doi.org/<doi>
-    * http[s]://doi-org.<subdomain>.grenet.fr/<doi>
-    * http[s]://<domain and path>/doi/[full/]/<doi>
-    * <doi>
-
-    Warns if any unrecognized values
-    """
-
-    def _parse(url, patterns, repl):
-        for pattern in patterns:
-            if re.match(pattern, url):
-                return re.sub(pattern, repl, url)
-
-    doi_pattern = r"(10\.\d{4}.+)"
-    patterns = [
-        # doi.org/<doi>, dx.doi.org/<doi>
-        r"^\s*https?:\/\/(?:dx\.)?doi\.org\/" + doi_pattern,
-        # doi-org.*.grenet.fr/<doi>
-        r"^\s*https?:\/\/doi-org\.[\w-]+\.grenet\.fr\/" + doi_pattern,
-        # */doi/[full/]/<doi>
-        r"^\s*https?:\/\/[\w\.]+\/doi\/(?:full\/)" + doi_pattern,
-        # <doi>
-        r"^\s*" + doi_pattern,
-    ]
-    repl = r"https://doi.org/\1"
-
-    standardized = []
-    unrecognized = []
-    for url in doi_links:
-        result = _parse(url, patterns, repl)
-        if result is not None:
-            standardized += [result]
-        else:
-            unrecognized += [url]
-
-    if any(unrecognized):
-        warn(f"Unrecognized DOI links: ({len(unrecognized)}):\n{unrecognized}")
-
-    return standardized
-
-
-def get_paper_details(doi) -> list[str]:
-    """Look up a paper DOI and return first author's name + ORCID, title, and year"""
-
-    url = f"https://api.crossref.org/works/{doi}"
-    try:
-        response = requests.get(url, timeout=10)
-    except requests.exceptions.ReadTimeout as err:
-        raise requests.exceptions.Timeout(f"Timed out getting {url}") from err
-
-    if response.status_code == 200:
-        data = response.json()
-        title = data["message"].get("title", ["No title found"])[0]
-        year = data["message"]["issued"]["date-parts"][0][0]
-        authors = data["message"].get("author", [])
-
-        # Get the first author's name, if available
-        if any(authors):
-            first_author = (
-                authors[0].get("given", "No author found")
-                + " "
-                + authors[0].get("family", "").upper()
-            )
-            orcid = authors[0].get("ORCID", "No ORCID found")
-        else:
-            first_author = "No author found"
-            orcid = "No ORCID found"
-
-        return title, year, first_author, orcid
+    # Possibly crossref or hal.science for paper details and write to CSV
+    if no_lookup:
+        logger.info("Skipping lookup of missing details")
     else:
-        return "DOI not found", "N/A", "N/A", "N/A"  # In case of invalid DOI or no data
+        logger.info("Looking up bibliographic details for %s papers", len(papers))
+    with csv_path.open(mode="w", newline="", encoding="utf-8") as file:
+        # Write header row
+        writer = csv.writer(file, dialect="unix")
+        writer.writerow(
+            [
+                "First Author",
+                "Year",
+                "DOI",
+                "HAL ID",
+                "Title",
+                "Journal",
+                "First Author ORCID",
+                "Team member listing the paper / HDR / thesis / book / chapter / other",
+                "Is a team member the first or corresponding author?",
+                "Theme",
+                "Note",
+                "Abstract",
+            ]
+        )
 
+        # Look up paper details and write to CSV, merging duplicates. Duplicates may
+        # remain if a paper was listed once with only DOI and again with only HAL ID
+        dois = {}
+        hal_ids = {}
+        n_duplicates = 0
+        for i, paper in enumerate(papers):
+            if not no_lookup and (i + 1) % 10 == 0:
+                logger.info("[%s of %s]", i + 1, len(papers))
 
-def csv2sheets() -> None:
-    """Read a list of papers from a Google Sheet and write to a CSV
+            # Merge duplicates
+            if paper.doi in dois or paper.hal_id in hal_ids:
+                # Find the previous occurence of the paper and update the lister
+                original = dois[paper.doi] if paper.doi in dois else hal_ids[paper.hal_id]
+                logger.info("Skipping %s (already added by %s)", paper, original.lister)
+                original.lister += f" + {paper.lister}"
+                n_duplicates += 1
+                continue
 
-    The CSV will have columns:
-    * First Author
-    * Year
-    * DOI
-    * Title
-    """
+            # Lookup bibliogrpahic details
+            if not no_lookup:
+                paper.lookup_details()
 
-    # Authenticate with the service account file
-    creds = Credentials.from_service_account_file(
-        CONFIG["service_account_key"], scopes=[CONFIG["scope_sheets_read"]]
-    )
-    client = gspread.authorize(creds)
+            # Write row
+            writer.writerow(
+                [
+                    paper.author,
+                    paper.year,
+                    paper.doi,
+                    paper.hal_id,
+                    paper.title,
+                    paper.journal,
+                    paper.orcid,
+                    paper.lister,
+                    paper.is_main,
+                    paper.theme,
+                    paper.note,
+                    paper.abstract,
+                ]
+            )
 
-    logger.info("Reading papers from Google Sheet %s", CONFIG['sheet_url'])
+            # Remember DOI and HAL ID for deduplication
+            if paper.has_doi():
+                dois[paper.doi] = paper
+            if paper.has_hal_id():
+                hal_ids[paper.hal_id] = paper
 
-    # Load and validate the sheet
-    sheet = client.open_by_url(CONFIG["sheet_url"]).sheet1
-    validate_layout(sheet)
+    # Report number of duplicates removed
+    if n_duplicates > 0:
+        logger.info("Merged %s duplicates", n_duplicates)
 
-    # Read DOIs from the column labelled 'DOI link'
-    headers = sheet.row_values(2)  # Column headers are on second row
-    doi_col_idx = headers.index("DOI link") + 1  # Google Sheets indexes from 1
-    doi_links = sheet.col_values(doi_col_idx)[2:]  # First to rows are headers
-
-    # Standardize the DOI links, warning about any that could not be standardized
-    doi_links = parse_doi_links(doi_links)
-
-    # Extract DOIs from the standardized links
-    dois = [s.split("doi.org/", 1)[1] for s in doi_links]
-
-    logger.info("Querying Crossref for %s papers", len(dois))
-
-    # Open a CSV file to write the data
-    out_path = Path("papers.csv")
-    if out_path.exists():
-        warn(f"{out_path} exists, overwriting.")
-    with open(out_path, mode="w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-
-        # Write the header row
-        writer.writerow(["First Author", "First Author ORCID", "Year", "DOI", "Title"])
-
-        # Fetch title and year for each DOI and write to the CSV file
-        for doi in dois:
-            title, year, first_author, orcid = get_paper_details(doi)
-            writer.writerow([first_author, orcid, year, doi, title])
-
-    print(f"Papers list written to {out_path}")
+    logger.info("Paper details written to %s", csv_path)
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-f", "--force", action="store_true", help="overwrite existing papers.csv file"
+    )
+    parser.add_argument(
+        "--no-lookup", action="store_true", help="do not look up missing details"
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="display DEBUG level messages"
+    )
+    args = parser.parse_args()
+
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO,
+        level=logging.DEBUG if args.verbose else logging.INFO,
     )
-    csv2sheets()
+
+    sheets2csv(force=args.force, no_lookup=args.no_lookup)

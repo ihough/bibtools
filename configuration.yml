@@ -1,12 +1,9 @@
-# Tool configuration
-
-# Path to the authentication key for your Google Cloud project service account
-service_account_key: REDACTED
-
-# URL of the Google Sheet listing the papers
-# The sheet must be shared with 'Anyone with the link can access' permissions
+# URL of the Google Sheet listing papers
+# The sheet must be shared with your service account or publicly. See 'Setup'
+# section of README.md for details.
 sheet_url: null
 
-# Scopes for Google Sheets API access. You shouldn't need to modify these.
-scope_sheets_read: https://www.googleapis.com/auth/spreadsheets.readonly
-scope_sheets_write: https://www.googleapis.com/auth/spreadsheets
+# Email to include in crossref queries (for politeness). If unset, bibtools will
+# try to use your git email (from `git config user.email`). For more info see
+# https://www.crossref.org/documentation/retrieve-metadata/rest-api/tips-for-using-the-crossref-rest-api/
+crossref_email: null
