@@ -2,5 +2,6 @@
 keys/
 
 # Output files
+*.png
 papers.csv
 references.bib

@@ -9,6 +9,7 @@ import gspread
 import pandas as pd
 import requests
 from google.oauth2.service_account import Credentials
+from wordcloud import STOPWORDS, WordCloud
 
 from configure import Configure
 
@@ -29,6 +30,7 @@ class Paper:
         is_main: True if a team member is first or corresponding author (default: False).
             Values 'true', 'yes', 'y', and 'oui' will be interpreted as True.
         note: Additional information (default: None)
+        theme: 1 if paper is OP/PMF-related; 2 if arctic/alpine/global atmosphere
         author: The paper's first author (default: None)
         orcid: The first author's ORCID (default: None)
         title: The paper's title (default: None)
@@ -44,6 +46,7 @@ class Paper:
         lister: str | None = None,
         is_main: bool | str = False,
         note: str | None = None,
+        theme: int | None = None,
         author: str | None = None,
         orcid: str | None = None,
         title: str | None = None,
@@ -69,6 +72,9 @@ class Paper:
         self.note = note
         if self.note is not None:
             self.note = self.note.strip()
+
+        # Research theme
+        self.theme = theme
 
         # Bibliographic details - use self.lookup_details() to set
         self.author = author
@@ -440,6 +446,70 @@ class Paper:
         raise ValueError(f"Unrecognized HAL ID: {hal_id}")
 
 
+def generate_wordcloud(
+    text: str,
+    width: int = 1000,
+    height: int = 500,
+    max_words: int = 200,
+    min_font_size: int = 8,
+    stopwords: set | None = None,
+    random_state: int = 42,
+    background_color: str = "white",
+    regexp: str = r"\w[\w\.\-']+",
+    min_word_length: int = 2,
+    collocations: bool = True,
+    collocation_threshold: int = 10,
+) -> WordCloud:
+    """Generate a wordcloud from text"""
+
+    if stopwords is None:
+        # fmt: off
+        stopwords = STOPWORDS.union(
+            ["abstract", "due", "overall", "study", "well", "one", "two", "three", "four",
+             "five"]
+        )
+        # fmt: on
+
+    # Preprocess text
+    # * Lowercase
+    # * Remove jats tags e.g. <jats:p>
+    # * Remove French accents
+    # * Standardize some spellings (e.g. 'factorization' -> 'factorisation')
+    # * Fix some typos (e.g. 'pm 2:5' -> 'pm2.5')
+    # * Remove period from end of words e.g. 'end.' -> 'end'
+    text = text.lower()
+    text = re.sub("</?jats.+?>", " ", text, flags=re.IGNORECASE)
+    text = text.translate(str.maketrans("àâèéêëîïôùûü", "aaeeeeiiouuu"))
+    text = text.translate(str.maketrans("ÀÂÈÉÊËÎÏÔÙÛÜ", "AAEEEEIIOUUU"))
+    text = re.sub(r"zation\b", r"sation\b", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bpm\s+2[\.:]5\b", "PM2.5", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bpm\s+10\b", "PM10", text, flags=re.IGNORECASE)
+    text = re.sub(r"(\w+)\.(\s|$)", r"\1\2", text)
+
+    cloud = WordCloud(
+        width=width,
+        height=height,
+        max_words=max_words,
+        min_font_size=min_font_size,
+        stopwords=stopwords,
+        random_state=random_state,
+        background_color=background_color,
+        regexp=regexp,
+        min_word_length=min_word_length,
+        collocations=collocations,
+        collocation_threshold=collocation_threshold,
+    )
+    cloud.generate(text)
+
+    # from matplotlib import pyplot as plt
+    # plt.figure(figsize=(10, 5))
+    # plt.imshow(cloud, interpolation="bilinear")
+    # plt.axis("off")
+    # plt.show()
+
+    return cloud
+
+
 def get_sheet(write: bool = False) -> gspread.Worksheet:
     """Load the Google Sheet
 
@@ -464,6 +534,33 @@ def get_sheet(write: bool = False) -> gspread.Worksheet:
     return sheet
 
 
+def get_csv_papers() -> list[Paper]:
+    """Read papers from a CSV"""
+
+    papers_df = read_csv()
+    mapping = {
+        "author": "First Author",
+        "year": "Year",
+        "doi": "DOI",
+        "hal_id": "HAL ID",
+        "title": "Title",
+        "journal": "Journal",
+        "orcid": "First Author ORCID",
+        "lister": "Team member listing the paper / HDR / thesis / book / chapter / other",
+        "is_main": "Is a team member the first or corresponding author?",
+        "theme": "Theme",
+        "note": "Note",
+        "abstract": "Abstract",
+    }
+
+    papers = []
+    for _, row in papers_df.iterrows():
+        paper = Paper(**{k: row[v] for k, v in mapping.items()})
+        papers.append(paper)
+
+    return papers
+
+
 def get_sheet_papers() -> list[Paper]:
     """Read papers from the Google Sheet, deduplicate, and return"""
 
@@ -484,6 +581,7 @@ def get_sheet_papers() -> list[Paper]:
         "orcid": "First Author ORCID",
         "lister": "Team member listing the paper / HDR / thesis / book / chapter / other",
         "is_main": "Is a team member the first or corresponding author?",
+        "theme": "Theme",
         "note": "Note",
         "abstract": "Abstract",
     }
@@ -518,6 +616,71 @@ def get_sheet_papers() -> list[Paper]:
         logger.info("Merged %s duplicates", n_duplicates)
 
     return papers
+
+
+def papers_to_wordclouds(
+    papers: list[Paper],
+    by_theme: bool = False,
+    force: bool = False,
+    hal_only: bool = False,
+    weight: int = 0,
+) -> WordCloud:
+    """Generate wordclouds from paper abstracts and titles"""
+
+    # Possibly exclude papers with no HAL ID
+    if hal_only:
+        papers = [p for p in papers if p.has_hal_id()]
+        if not any(papers):
+            raise ValueError("No papers have HAL ID")
+
+    # Possibly give extra weight when team member is first or corresping author
+    # by duplicating those papers
+    papers += [p for p in papers if p.is_main] * weight
+
+    # Possibly group papers by research theme
+    groups = {}
+    if by_theme:
+        for paper in papers:
+            theme = paper.theme if paper.theme else "none"
+            if theme in groups:
+                groups[theme].append(paper)
+            else:
+                groups[theme] = [paper]
+    else:
+        groups["all papers"] = papers
+
+    for theme, theme_papers in groups.items():
+        suffix = "" if theme == "all papers" else f"-theme-{theme}"
+
+        # Check abstracts wordcloud path
+        abstracts_path = Path(f"wordcloud_abstracts{suffix}.png")
+        if abstracts_path.exists() and not force:
+            raise ValueError(f"File exists: {abstracts_path}. Use --force to overwrite")
+
+        # Get abstracts
+        abstracts = [p.abstract for p in theme_papers if p.abstract]
+        if len(abstracts) != len(theme_papers):
+            warn(f"Skipped {len(theme_papers) - len(abstracts)} papers with no abstract")
+
+        # Generate wordcloud
+        abstracts_cloud = generate_wordcloud("\n".join(abstracts))
+        abstracts_cloud.to_file(abstracts_path)
+        logger.info("-> %s", abstracts_path)
+
+        # Check titles wordcloud path
+        titles_path = Path(f"wordcloud_titles{suffix}.png")
+        if titles_path.exists() and not force:
+            raise ValueError(f"File exists: {titles_path}. Use --force to overwrite")
+
+        # Get titles
+        titles = [p.title for p in theme_papers if p.title]
+        if len(titles) != len(theme_papers):
+            warn(f"Skipped {len(theme_papers) - len(titles)} papers with no title")
+
+        # Generate wordcloud
+        titles_cloud = generate_wordcloud("\n".join(titles))
+        titles_cloud.to_file(titles_path)
+        logger.info("-> %s", titles_path)
 
 
 def read_csv(validate: bool = True) -> pd.DataFrame:

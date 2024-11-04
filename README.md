@@ -5,6 +5,7 @@ Tools for visualizing research publications.
 * Read or update a Google Sheet listing papers
 * Deduplicate papers based on DOI and HAL ID
 * Look up bibliographic details and abstracts from [Crossref](https://www.crossref.org/documentation/retrieve-metadata/rest-api/), [HAL](https://api.archives-ouvertes.fr/docs/search), [Semantic Scholar](https://api.semanticscholar.org/api-docs/), and [Scopus](https://dev.elsevier.com/documentation/AbstractRetrievalAPI.wadl)
+* Create wordclouds from titles and abstracts
 
 
 ## Tools
@@ -12,6 +13,10 @@ Tools for visualizing research publications.
 * `sheets2csv`: read papers from a Google Sheet, look up bibliographic details and abstracts, and write to `papers.csv`
 
 * `csv2sheets`: update a Google Sheet with bibliographic details and abstracts from `papers.csv`
+
+* `sheets2wordcloud`: read paper titles and abstracts from a Google Sheet and generate wordclouds
+
+* `csv2wordcloud`: read paper titles and abstracts from `papers.csv` and generate wordclouds
 
 * `sheets2bib`: read papers from a Google Sheet, look up bibtex records, and write to `references.bib`
 
@@ -65,3 +70,5 @@ To look up bibliographic details for papers in the Google Sheet, use `sheets2csv
 To update the Google Sheet with the bibliographic details in `papers.csv`, use `csv2sheets.py`.
 
 To copy bibliographic details from the Google Sheet to `papers.csv` without looking up missing details, use `sheets2csv.py --no-lookup`
+
+To generate wordclouds by research theme using only papers with a HAL ID, use `csv2wordcloud --by-theme --hal-only` or `sheets2wordcloud --by-theme --hal-only`.
