@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """Update Google Sheet with paper bibliographic details from a CSV"""
 
 import argparse
 import logging
 
-from utils import read_csv, get_sheet
+from utils import read_csv, get_sheet, PAPER_TO_SHEET
 
 
 logger = logging.getLogger(__name__)
@@ -15,22 +15,21 @@ def csv2sheets():
     """Update Google Sheet with paper bibliographic details from a CSV"""
 
     # Read papers from the CSV
-    papers = read_csv()
-    if not any(papers):
-        raise ValueError("No papers found in CSV")
+    papers_df = read_csv()
 
     # Convert DOI and HAL ID to links
-    papers["DOI link"] = papers["DOI"].apply(
+    papers_df["doi"] = papers_df["doi"].apply(
         lambda doi: doi if doi == "no doi" else f"https://doi.org/{doi}"
     )
-    papers["HAL link"] = papers["HAL ID"].apply(
-        lambda id: id if id == "no hal id" else f"https://hal.science/{id}"
+    papers_df["hal_id"] = papers_df["hal_id"].apply(
+        lambda hal: hal if hal == "no hal id" else f"https://hal.science/{hal}"
     )
 
-    # Convert first/corresponding author from True/False to Yes/No
-    papers["Is a team member the first or corresponding author?"] = papers[
-        "Is a team member the first or corresponding author?"
-    ].apply(lambda x: "Yes" if x else "No")
+    # Convert first/corresponding author is team member from True/False to Yes/No
+    papers_df["is_main"] = papers_df["is_main"].apply(lambda x: "Yes" if x else "No")
+
+    # Rename columns to match Google Sheet headers
+    papers_df = papers_df.rename(columns=PAPER_TO_SHEET)
 
     # Clear the Google Sheet except the first two rows (titles + headers)
     sheet = get_sheet(write=True)
@@ -40,9 +39,9 @@ def csv2sheets():
     sheet.update(values=[titles, headers], range_name="A1")
 
     # Write paper details
-    sheet.update(values=papers[headers].values.tolist(), range_name="A3")
+    sheet.update(values=papers_df[headers].values.tolist(), range_name="A3")
 
-    logger.info("Updated %s", sheet.url)
+    logger.info("Updated Google Sheet with paper details")
 
 
 if __name__ == "__main__":

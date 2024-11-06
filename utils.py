@@ -2,9 +2,12 @@
 
 import logging
 import re
+import string
+from dataclasses import dataclass, field
 from pathlib import Path
 from warnings import warn
 
+import argparse
 import gspread
 import pandas as pd
 import requests
@@ -13,10 +16,9 @@ from wordcloud import STOPWORDS, WordCloud
 
 from configure import Configure
 
-
 logger = logging.getLogger(__name__)
-CONFIG = Configure()
 
+CONFIG = Configure()
 
 # Mapping of Paper attributes / CSV headers to Google Sheet headers
 PAPER_TO_SHEET = {
@@ -34,6 +36,8 @@ PAPER_TO_SHEET = {
     "abstract": "Abstract",
 }
 
+
+@dataclass(kw_only=True)
 class Paper:
     """Class to represent a scientific publication
 
@@ -42,77 +46,40 @@ class Paper:
             https://doi.org/10.1000/182. Set to 'no doi' the paper has no DOI.
         hal_id: The paper's HAL ID. A paper must have a HAL ID or DOI. May be a link e.g.
             https://hal.science/hal-00000001v1. Set to 'no hal id' if paper has no HAL ID.
-        lister: The person(s) that added the paper (default: None)
-        is_main: True if a team member is first or corresponding author (default: False).
-            Values 'true', 'yes', 'y', and 'oui' will be interpreted as True.
-        note: Additional information (default: None)
-        theme: 1 if paper is OP/PMF-related; 2 if arctic/alpine/global atmosphere
         author: The paper's first author (default: None)
-        orcid: The first author's ORCID (default: None)
-        title: The paper's title (default: None)
         year: The paper's publication year (default: None)
+        is_main: Whether a team member is first or corresponding author (default: False).
+            Values 'true', 'yes', 'y', and 'oui' will be interpreted as True.
+        theme: Can be used to group papers by research theme (default: None)
+        lister: The team member that listed the paper (default: None)
+        note: Additional information (default: None)
+        title: The paper's title (default: None)
         journal: The paper's journal (default: None)
+        orcid: The first author's ORCID (default: None)
         abstract: The paper's abstract (default: None)
     """
 
-    def __init__(
-        self,
-        doi: str | None = None,
-        hal_id: str | None = None,
-        lister: str | None = None,
-        is_main: bool | str = False,
-        note: str | None = None,
-        theme: int | None = None,
-        author: str | None = None,
-        orcid: str | None = None,
-        title: str | None = None,
-        year: str | None = None,
-        journal: str | None = None,
-        abstract: str | None = None,
-    ) -> None:
-        # Parse DOI and HAL ID
-        self.doi = self.parse_doi(doi)
-        self.hal_id = self.parse_hal_id(hal_id)
+    doi: str | None = None
+    hal_id: str | None = None
+    author: str | None = None
+    year: int | None = None
+    is_main: bool | str = False
+    theme: int | None = None
+    lister: str | None = field(repr=False, default=None)
+    note: str | None = field(repr=False, default=None)
+    title: str | None = field(repr=False, default=None)
+    journal: str | None = field(repr=False, default=None)
+    orcid: str | None = field(repr=False, default=None)
+    abstract: str | None = field(repr=False, default=None)
+    _rate_limit: int = field(init=False, repr=False, default=50)
+
+    def __post_init__(self) -> None:
+        self.doi = self.parse_doi(self.doi)
+        self.hal_id = self.parse_hal_id(self.hal_id)
         if not self.has_doi() and not self.has_hal_id():
             raise ValueError("Paper must have DOI or HAL ID; got neither.")
 
-        # Person that added the paper
-        self.lister = lister
-        if self.lister is not None:
-            self.lister = self.lister.strip()
-
-        # Is a team member the first or corresponding author?
-        self.is_main = str(is_main).strip().lower() in ["true", "yes", "y", "oui"]
-
-        # Additional information
-        self.note = note
-        if self.note is not None:
-            self.note = self.note.strip()
-
-        # Research theme
-        self.theme = theme
-
-        # Bibliographic details - use self.lookup_details() to set
-        self.author = author
-        self.orcid = orcid
-        self.title = title
-        self.year = year
-        self.journal = journal
-        self.abstract = abstract
-
-        # Rate limit for crossref queries (per second)
-        self._rate_limit = 50
-
-    def __repr__(self) -> str:
-        desc = "Paper("
-        if self.doi:
-            desc += f"doi:{self.doi}"
-        if self.hal_id:
-            if self.doi:
-                desc += " "
-            desc += f"hal:{self.hal_id}"
-        desc += ")"
-        return desc
+        self.is_main = str(self.is_main).strip().lower() in ["true", "yes", "y", "oui"]
 
     def _get(self, url: str, headers: str = None, timeout: int = 10) -> requests.Response:
         """GET a url and raise if request times out or status != 200"""
@@ -497,7 +464,7 @@ def generate_wordcloud(
     text = re.sub("</?jats.+?>", " ", text, flags=re.IGNORECASE)
     text = text.translate(str.maketrans("àâèéêëîïôùûü", "aaeeeeiiouuu"))
     text = text.translate(str.maketrans("ÀÂÈÉÊËÎÏÔÙÛÜ", "AAEEEEIIOUUU"))
-    text = re.sub(r"zation\b", r"sation\b", text, flags=re.IGNORECASE)
+    text = re.sub(r"zation\b", "sation", text, flags=re.IGNORECASE)
     text = re.sub(r"\bpm\s+2[\.:]5\b", "PM2.5", text, flags=re.IGNORECASE)
     text = re.sub(r"\bpm\s+10\b", "PM10", text, flags=re.IGNORECASE)
     text = re.sub(r"(\w+)\.(\s|$)", r"\1\2", text)
@@ -554,25 +521,7 @@ def get_csv_papers() -> list[Paper]:
     """Read papers from a CSV"""
 
     papers_df = read_csv()
-    mapping = {
-        "author": "First Author",
-        "year": "Year",
-        "doi": "DOI",
-        "hal_id": "HAL ID",
-        "title": "Title",
-        "journal": "Journal",
-        "orcid": "First Author ORCID",
-        "lister": "Team member listing the paper / HDR / thesis / book / chapter / other",
-        "is_main": "Is a team member the first or corresponding author?",
-        "theme": "Theme",
-        "note": "Note",
-        "abstract": "Abstract",
-    }
-
-    papers = []
-    for _, row in papers_df.iterrows():
-        paper = Paper(**{k: row[v] for k, v in mapping.items()})
-        papers.append(paper)
+    papers = [Paper(**row) for _, row in papers_df.iterrows()]
 
     return papers
 
@@ -622,6 +571,9 @@ def get_sheet_papers() -> list[Paper]:
     if n_duplicates > 0:
         logger.info("Merged %s duplicates", n_duplicates)
 
+    if not any(papers):
+        raise ValueError(f"No papers found in Google Sheet {sheet.url}")
+
     return papers
 
 
@@ -630,19 +582,38 @@ def papers_to_wordclouds(
     by_theme: bool = False,
     force: bool = False,
     hal_only: bool = False,
-    weight: int = 0,
+    weight: int = 1,
 ) -> WordCloud:
     """Generate wordclouds from paper abstracts and titles"""
+
+    def make_wordcloud(papers: list[Paper], field: str, suffix: str) -> None:
+        # Check output path
+        out_path = Path(f"wordcloud_{field}s{suffix}.png")
+        if out_path.exists() and not force:
+            raise ValueError(f"File exists: {out_path}. Use --force to overwrite")
+
+        # Get field from all papers
+        text = [getattr(p, field) for p in papers if getattr(p, field)]
+        if len(text) != len(papers):
+            n_skipped = len(papers) - len(text)
+            warn(f"Skipped {n_skipped} papers with no {field}")
+
+        # Possibly give extra weight when team member is first or corresping author
+        if weight > 1:
+            text += [
+                getattr(p, field) for p in papers if p.is_main and getattr(p, field)
+            ] * (weight - 1)
+
+        # Generate and save wordcloud
+        cloud = generate_wordcloud("\n".join(text))
+        cloud.to_file(out_path)
+        logger.info("Saved %s", out_path)
 
     # Possibly exclude papers with no HAL ID
     if hal_only:
         papers = [p for p in papers if p.has_hal_id()]
         if not any(papers):
             raise ValueError("No papers have HAL ID")
-
-    # Possibly give extra weight when team member is first or corresping author
-    # by duplicating those papers
-    papers += [p for p in papers if p.is_main] * weight
 
     # Possibly group papers by research theme
     groups = {}
@@ -658,36 +629,40 @@ def papers_to_wordclouds(
 
     for theme, theme_papers in groups.items():
         suffix = "" if theme == "all papers" else f"-theme-{theme}"
+        make_wordcloud(theme_papers, field="abstract", suffix=suffix)
+        make_wordcloud(theme_papers, field="title", suffix=suffix)
 
-        # Check abstracts wordcloud path
-        abstracts_path = Path(f"wordcloud_abstracts{suffix}.png")
-        if abstracts_path.exists() and not force:
-            raise ValueError(f"File exists: {abstracts_path}. Use --force to overwrite")
 
-        # Get abstracts
-        abstracts = [p.abstract for p in theme_papers if p.abstract]
-        if len(abstracts) != len(theme_papers):
-            warn(f"Skipped {len(theme_papers) - len(abstracts)} papers with no abstract")
+def parse_wordcloud_args() -> argparse.Namespace:
+    """Parse command-line arguments for wordclouds"""
 
-        # Generate wordcloud
-        abstracts_cloud = generate_wordcloud("\n".join(abstracts))
-        abstracts_cloud.to_file(abstracts_path)
-        logger.info("-> %s", abstracts_path)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--by-theme",
+        action="store_true",
+        help="generate separate wordclouds for each research theme",
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="overwrite existing wordcloud_*.png files",
+    )
+    parser.add_argument(
+        "--hal-only",
+        action="store_true",
+        help="exclude papers that do not have a HAL ID",
+    )
+    parser.add_argument(
+        "-w",
+        "--weight",
+        default=1,
+        type=int,
+        help="set this to an integer >1 to give extra weight to papers where a team"
+        + "member is the first or corresponding author",
+    )
 
-        # Check titles wordcloud path
-        titles_path = Path(f"wordcloud_titles{suffix}.png")
-        if titles_path.exists() and not force:
-            raise ValueError(f"File exists: {titles_path}. Use --force to overwrite")
-
-        # Get titles
-        titles = [p.title for p in theme_papers if p.title]
-        if len(titles) != len(theme_papers):
-            warn(f"Skipped {len(theme_papers) - len(titles)} papers with no title")
-
-        # Generate wordcloud
-        titles_cloud = generate_wordcloud("\n".join(titles))
-        titles_cloud.to_file(titles_path)
-        logger.info("-> %s", titles_path)
+    return parser.parse_args()
 
 
 def read_csv(validate: bool = True) -> pd.DataFrame:
@@ -700,69 +675,38 @@ def read_csv(validate: bool = True) -> pd.DataFrame:
     # Read CSV
     csv_path = Path("papers.csv")
     logger.info("Reading %s", csv_path)
-    df = pd.read_csv(csv_path).replace({float("nan"): None})
+    papers_df = pd.read_csv(csv_path).replace({float("nan"): None})
 
     # Possibly confirm the CSV has the expected layout
     if validate:
-        validate_csv(df)
+        validate_csv(papers_df)
 
-    return df
+    if papers_df.shape[0] == 0:
+        raise ValueError(f"No papers found in {csv_path}")
+
+    return papers_df
 
 
 def validate_csv(csv: pd.DataFrame) -> None:
-    """Confirm a CSV file has the expected layout"""
+    """Confirm CSV file has the expected layout"""
 
-    def _validate(col: int, expected: str) -> None:
-        actual = csv.columns[col]
-        if actual.lower().strip() != expected.lower().strip():
+    for i, expected in enumerate(PAPER_TO_SHEET):
+        if csv.columns[i].lower().strip() != expected.lower().strip():
             raise ValueError(
-                "Unrecognized CSV layout."
-                + f" Column {col} should contain '{expected}'; got '{actual}'."
+                "Unrecognized csv layout."
+                + f" Column {i} header should be '{expected}'; got '{csv.columns[i]}'."
             )
-
-    _validate(col=0, expected="First Author")
-    _validate(col=1, expected="Year")
-    _validate(col=2, expected="DOI")
-    _validate(col=3, expected="HAL ID")
-    _validate(col=4, expected="Title")
-    _validate(col=5, expected="Journal")
-    _validate(col=6, expected="First Author ORCID")
-    _validate(
-        col=7,
-        expected="Team member listing the paper / HDR / thesis / book / chapter / other",
-    )
-    _validate(col=8, expected="Is a team member the first or corresponding author?")
-    _validate(col=9, expected="Theme")
-    _validate(col=10, expected="Note")
-    _validate(col=11, expected="Abstract")
 
 
 def validate_sheet(sheet: gspread.Worksheet) -> None:
-    """Confirm a Google Sheet has the expected layout"""
+    """Confirm the Google Sheet has the expected layout"""
 
-    def _validate(cell: str, expected: str) -> None:
-        try:
-            actual = sheet.get_values(cell)[0][0]
-        except IndexError:
-            actual = ""
-        if actual.lower().strip() != expected.lower().strip():
+    header_row = 2
+    headers = sheet.row_values(header_row)
+    for i, expected in enumerate(PAPER_TO_SHEET.values()):
+        if headers[i].lower().strip() != expected.lower().strip():
+            cell = string.ascii_uppercase[i] + str(header_row)
             raise ValueError(
                 "Unrecognized sheet layout."
-                + f" Cell {cell} should contain '{expected}'; got '{actual}'."
+                + f" Cell {cell} should contain '{expected}'; got '{headers[i]}'."
             )
-
-    _validate(
-        cell="A2",
-        expected="Team member listing the paper / HDR / thesis / book / chapter / other",
-    )
-    _validate(cell="B2", expected="DOI link")
-    _validate(cell="C2", expected="HAL link")
-    _validate(cell="D2", expected="Is a team member the first or corresponding author?")
-    _validate(cell="E2", expected="Theme")
-    _validate(cell="F2", expected="Note")
-    _validate(cell="G2", expected="Title")
-    _validate(cell="H2", expected="First Author")
-    _validate(cell="I2", expected="Year")
-    _validate(cell="J2", expected="Journal")
-    _validate(cell="K2", expected="First Author ORCID")
-    _validate(cell="L2", expected="Abstract")

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """Read papers from Google Sheet, lookup details, and write to BibTeX file"""
 
@@ -21,8 +21,6 @@ def sheets2bib(force: bool = False) -> None:
 
     # Read deduplicated papers from the Google Sheet
     papers = get_sheet_papers()
-    if not any(papers):
-        raise ValueError("No papers found in Google Sheet")
 
     # Query crossref or hal.science for paper BibTeX and write to .bib file
     logger.info("Getting BibTeX for %s papers", len(papers))

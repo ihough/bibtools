@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """Read papers from Google Sheet, lookup bibliographic details, and write to CSV"""
 
@@ -7,7 +7,7 @@ import csv
 import logging
 from pathlib import Path
 
-from utils import get_sheet_papers
+from utils import get_sheet_papers, PAPER_TO_SHEET
 
 
 logger = logging.getLogger(__name__)
@@ -22,8 +22,6 @@ def sheets2csv(force: bool = False, no_lookup: bool = False) -> None:
 
     # Read deduplicated papers from the Google Sheet
     papers = get_sheet_papers()
-    if not any(papers):
-        raise ValueError("No papers found in Google Sheet")
 
     # Possibly crossref or hal.science for paper details and write to CSV
     if no_lookup:
@@ -33,22 +31,7 @@ def sheets2csv(force: bool = False, no_lookup: bool = False) -> None:
     with csv_path.open(mode="w", newline="", encoding="utf-8") as file:
         # Write header row
         writer = csv.writer(file, dialect="unix")
-        writer.writerow(
-            [
-                "First Author",
-                "Year",
-                "DOI",
-                "HAL ID",
-                "Title",
-                "Journal",
-                "First Author ORCID",
-                "Team member listing the paper / HDR / thesis / book / chapter / other",
-                "Is a team member the first or corresponding author?",
-                "Theme",
-                "Note",
-                "Abstract",
-            ]
-        )
+        writer.writerow(PAPER_TO_SHEET.keys())
 
         # Look up paper details and write to CSV, merging duplicates. Duplicates may
         # remain if a paper was listed once with only DOI and again with only HAL ID
@@ -68,27 +51,12 @@ def sheets2csv(force: bool = False, no_lookup: bool = False) -> None:
                 n_duplicates += 1
                 continue
 
-            # Lookup bibliogrpahic details
+            # Possibly lookup bibliogrpahic details
             if not no_lookup:
                 paper.lookup_details()
 
-            # Write row
-            writer.writerow(
-                [
-                    paper.author,
-                    paper.year,
-                    paper.doi,
-                    paper.hal_id,
-                    paper.title,
-                    paper.journal,
-                    paper.orcid,
-                    paper.lister,
-                    paper.is_main,
-                    paper.theme,
-                    paper.note,
-                    paper.abstract,
-                ]
-            )
+            # Write details to CSV
+            writer.writerow([getattr(paper, attr) for attr in PAPER_TO_SHEET])
 
             # Remember DOI and HAL ID for deduplication
             if paper.has_doi():

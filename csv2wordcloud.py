@@ -1,11 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """Read paper titles and abstracts from a CSV and generate wordclouds"""
 
 import logging
 
-from sheets2wordcloud import parse_wordcloud_args
-from utils import get_csv_papers, papers_to_wordclouds
+from utils import get_csv_papers, papers_to_wordclouds, parse_wordcloud_args
 
 
 logger = logging.getLogger(__name__)
@@ -18,8 +17,6 @@ def csv2wordcloud(
 
     # Read papers from CSV
     papers = get_csv_papers()
-    if not any(papers):
-        raise ValueError("No papers found in CSV")
 
     # Generate wordclouds from titles and abstracts
     papers_to_wordclouds(
