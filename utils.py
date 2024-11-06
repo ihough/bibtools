@@ -18,6 +18,22 @@ logger = logging.getLogger(__name__)
 CONFIG = Configure()
 
 
+# Mapping of Paper attributes / CSV headers to Google Sheet headers
+PAPER_TO_SHEET = {
+    "lister": "Team member listing the paper / HDR / thesis / book / chapter / other",
+    "doi": "DOI link",
+    "hal_id": "HAL link",
+    "is_main": "Is a team member the first or corresponding author?",
+    "theme": "Theme",
+    "note": "Note",
+    "title": "Title",
+    "author": "First Author",
+    "year": "Year",
+    "journal": "Journal",
+    "orcid": "First Author ORCID",
+    "abstract": "Abstract",
+}
+
 class Paper:
     """Class to represent a scientific publication
 
@@ -571,22 +587,13 @@ def get_sheet_papers() -> list[Paper]:
     hal_ids = {}
     n_duplicates = 0
     papers = []
-    mapping = {
-        "author": "First Author",
-        "year": "Year",
-        "doi": "DOI link",
-        "hal_id": "HAL link",
-        "title": "Title",
-        "journal": "Journal",
-        "orcid": "First Author ORCID",
-        "lister": "Team member listing the paper / HDR / thesis / book / chapter / other",
-        "is_main": "Is a team member the first or corresponding author?",
-        "theme": "Theme",
-        "note": "Note",
-        "abstract": "Abstract",
-    }
-    for i, record in enumerate(sheet.get_records(head=2, default_blank=None)):
-        kwargs = {k: record[v] for k, v in mapping.items()}
+
+    for i, record in enumerate(
+        sheet.get_all_records(
+            head=2, expected_headers=PAPER_TO_SHEET.values(), default_blank=None
+        )
+    ):
+        kwargs = {k: record[v] for k, v in PAPER_TO_SHEET.items()}
         try:
             paper = Paper(**kwargs)
         except ValueError as err:
