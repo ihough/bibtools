@@ -72,7 +72,11 @@ def sheets2csv(force: bool = False, no_lookup: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Read papers from the Google Sheet, look up bibliographic details and"
+        + " abstracts from Crossref, HAL, Semantic Scholar, and SCOPUS, and write to"
+        + " papers.csv"
+    )
     parser.add_argument(
         "-f", "--force", action="store_true", help="overwrite existing papers.csv file"
     )

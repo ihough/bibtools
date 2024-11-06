@@ -56,7 +56,10 @@ def sheets2bib(force: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Read papers from the Google Sheet, look up BibTeX from Crossref and"
+        + " HAL, and write to references.bib"
+    )
     parser.add_argument(
         "-f",
         "--force",

@@ -45,7 +45,9 @@ def csv2sheets():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Update the Google Sheet with bibliographic details from papers.csv"
+    )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="display DEBUG level messages"
     )

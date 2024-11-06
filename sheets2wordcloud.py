@@ -25,7 +25,9 @@ def sheets2wordcloud(
 
 
 if __name__ == "__main__":
-    args = parse_wordcloud_args()
+    args = parse_wordcloud_args(
+        description="Generate wordclouds from the titles and abstracts in the Google Sheet"
+    )
 
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(message)s",

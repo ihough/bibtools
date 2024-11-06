@@ -633,10 +633,10 @@ def papers_to_wordclouds(
         make_wordcloud(theme_papers, field="title", suffix=suffix)
 
 
-def parse_wordcloud_args() -> argparse.Namespace:
+def parse_wordcloud_args(description: str | None = None) -> argparse.Namespace:
     """Parse command-line arguments for wordclouds"""
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "--by-theme",
         action="store_true",
