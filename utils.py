@@ -586,23 +586,30 @@ def papers_to_wordclouds(
 ) -> WordCloud:
     """Generate wordclouds from paper abstracts and titles"""
 
-    def make_wordcloud(papers: list[Paper], field: str, suffix: str) -> None:
+    def make_wordcloud(papers: list[Paper], fields: str | list[str], suffix: str) -> None:
+        if isinstance(fields, str):
+            fields = [fields]
+
         # Check output path
-        out_path = Path(f"wordcloud_{field}s{suffix}.png")
+        out_path = Path(f"wordcloud_{'+'.join(fields)}{suffix}.png")
         if out_path.exists() and not force:
             raise ValueError(f"File exists: {out_path}. Use --force to overwrite")
 
-        # Get field from all papers
-        text = [getattr(p, field) for p in papers if getattr(p, field)]
-        if len(text) != len(papers):
-            n_skipped = len(papers) - len(text)
-            warn(f"Skipped {n_skipped} papers with no {field}")
+        # Get field(s) from all papers
+        text = []
+        for field in fields:
+            field_text = [getattr(p, field) for p in papers if getattr(p, field)]
+            if len(field_text) != len(papers):
+                n_skipped = len(papers) - len(field_text)
+                warn(f"Skipped {n_skipped} papers with no {field}")
 
-        # Possibly give extra weight when team member is first or corresping author
-        if weight > 1:
-            text += [
-                getattr(p, field) for p in papers if p.is_main and getattr(p, field)
-            ] * (weight - 1)
+            # Possibly give extra weight when team member is first or corresping author
+            if weight > 1:
+                field_text += [
+                    getattr(p, field) for p in papers if p.is_main and getattr(p, field)
+                ] * (weight - 1)
+
+            text += field_text
 
         # Generate and save wordcloud
         cloud = generate_wordcloud("\n".join(text))
@@ -628,9 +635,10 @@ def papers_to_wordclouds(
         groups["all papers"] = papers
 
     for theme, theme_papers in groups.items():
-        suffix = "" if theme == "all papers" else f"-theme-{theme}"
-        make_wordcloud(theme_papers, field="abstract", suffix=suffix)
-        make_wordcloud(theme_papers, field="title", suffix=suffix)
+        suffix = "" if theme == "all papers" else f"_theme-{theme}"
+        make_wordcloud(theme_papers, fields="abstract", suffix=suffix)
+        make_wordcloud(theme_papers, fields="title", suffix=suffix)
+        make_wordcloud(theme_papers, fields=["abstract", "title"], suffix=suffix)
 
 
 def parse_wordcloud_args(description: str | None = None) -> argparse.Namespace:
