@@ -712,9 +712,10 @@ def validate_sheet(sheet: gspread.Worksheet) -> None:
     header_row = 2
     headers = sheet.row_values(header_row)
     for i, expected in enumerate(PAPER_TO_SHEET.values()):
-        if headers[i].lower().strip() != expected.lower().strip():
+        actual = headers[i] if i < len(headers) else ""
+        if actual.lower().strip() != expected.lower().strip():
             cell = string.ascii_uppercase[i] + str(header_row)
             raise ValueError(
                 "Unrecognized sheet layout."
-                + f" Cell {cell} should contain '{expected}'; got '{headers[i]}'."
+                + f" Cell {cell} should contain '{expected}'; got '{actual}'."
             )
