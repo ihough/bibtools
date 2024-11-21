@@ -225,8 +225,9 @@ class Paper:
         url = f"https://api.crossref.org/works/{self.doi}"
         response = self._get(url, headers=self.crossref_headers())
 
+        # Return if DOI not found
         if response.status_code == 404:
-            raise ValueError(f"No crossref record for doi:{self.doi}")
+            return {}
 
         if response.status_code != 200:
             raise ValueError(f"Error: status {response.status_code} from {url}")
@@ -257,6 +258,38 @@ class Paper:
         if any(data.get("container-title", [])):
             details["journal"] = data["container-title"][0]
         abstract = data.get("abstract")
+        if abstract is not None:
+            details["abstract"] = re.sub(r"\s+", " ", abstract).strip()
+
+        return details
+
+    def get_details_datacite(self) -> dict:
+        """Query datacite.org with a DOI and return details"""
+
+        url = f"https://api.datacite.org/dois/{self.doi}"
+        response = self._get(url, headers=self.crossref_headers())
+
+        # Return if DOI not found
+        if response.status_code == 404:
+            return {}
+
+        if response.status_code != 200:
+            raise ValueError(f"Error: status {response.status_code} from {url}")
+
+        data = response.json()["data"]["attributes"]
+        author = data["creators"][0]
+        details = {
+            "doi": data["doi"],
+            "author": author["givenName"] + " " + author["familyName"].upper(),
+            "title": re.sub(r"\s+", " ", data["titles"][0]["title"]).strip(),
+            "year": data["publicationYear"],
+        }
+        abstract = None
+        if any(data.get("descriptions")):
+            for desc in data["descriptions"]:
+                if desc["descriptionType"] == "Abstract":
+                    abstract = desc["description"]
+                    break
         if abstract is not None:
             details["abstract"] = re.sub(r"\s+", " ", abstract).strip()
 
@@ -346,6 +379,10 @@ class Paper:
         if self.has_doi():
             info |= self.get_details_crossref()  # prefer info from crossref
 
+            # If no info, query datacite (in case the 'paper' is a dataset or software)
+            if not any(info):
+                info = self.get_details_datacite()
+
             # If abstract is missing, try to get it from semantic scholar
             if info.get("abstract") is None:
                 info["abstract"] = self.get_abstract_semanticscholar()
@@ -356,7 +393,7 @@ class Paper:
 
         # Raise if could not find bibliographic details
         if not any(info):
-            raise ValueError(f"No crossref or hal.science record found for {self}")
+            raise ValueError(f"No HAL, Crossref, or DataCite record for {self}")
 
         # Set bibliographic attributes
         self.author = info.get("author")

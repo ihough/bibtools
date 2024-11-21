@@ -6,7 +6,7 @@ Tools for visualizing research publications.
 
 Run any tool with `-h` or `--help` to display help.
 
-Read papers from the Google Sheet, look up bibliographic details and abstracts from [Crossref](https://www.crossref.org/), [HAL](https://hal.science), [Semantic Scholar](https://www.semanticscholar.org/), and [SCOPUS](https://www.elsevier.com/products/scopus), and write to `papers.csv`:
+Read papers from the Google Sheet, look up bibliographic details and abstracts from [Crossref](https://www.crossref.org/), [HAL](https://hal.science), [DataCite](https://datacite.org/), [Semantic Scholar](https://www.semanticscholar.org/), and [SCOPUS](https://www.elsevier.com/products/scopus), and write to `papers.csv`:
 
 ```bash
 python sheets2csv.py
