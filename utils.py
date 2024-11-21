@@ -244,16 +244,17 @@ class Paper:
             self._rate_limit = rate_limit
 
         data = response.json()["message"]
-        author = data["author"][0]
         details = {
             "doi": data["DOI"],
-            "author": author["given"] + " " + author["family"].upper(),
             "title": re.sub(r"\s+", " ", data["title"][0]).strip(),
             "year": data["issued"]["date-parts"][0][0],
         }
-        if author.get("ORCID") is not None:
-            details["orcid"] = author.get("ORCID")
-        if any(data.get("container-title")):
+        if any(data.get("author", [])):
+            author = data["author"][0]
+            details["author"] = author["given"] + " " + author["family"].upper()
+            if author.get("ORCID") is not None:
+                details["orcid"] = author.get("ORCID")
+        if any(data.get("container-title", [])):
             details["journal"] = data["container-title"][0]
         abstract = data.get("abstract")
         if abstract is not None:
@@ -358,7 +359,7 @@ class Paper:
             raise ValueError(f"No crossref or hal.science record found for {self}")
 
         # Set bibliographic attributes
-        self.author = info["author"]
+        self.author = info.get("author")
         self.orcid = info.get("orcid")
         self.title = info["title"]
         self.year = info["year"]
