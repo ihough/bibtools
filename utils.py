@@ -176,7 +176,7 @@ class Paper:
         """Query crossref.org with the paper's DOI and return a BibTeX entry"""
 
         url = f"https://api.crossref.org/works/{self.doi}/transform"
-        headers = {"Accept": "text/bibliography; style=bibtex"}
+        headers = {"Accept": "application/x-bibtex"}
         if self.crossref_headers() is not None:
             headers |= self.crossref_headers()
         response = self._get(url, headers=headers)
