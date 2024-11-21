@@ -557,7 +557,10 @@ def get_sheet_papers() -> list[Paper]:
             except KeyError:
                 original = hal_ids[paper.hal_id]
             logger.debug("Skipping %s (already added by %s)", paper, original.lister)
-            original.lister += f" + {paper.lister}"
+            if paper.lister != original.lister and any([original.lister, paper.lister]):
+                paper.lister = " + ".join(
+                    [x for x in [original.lister, paper.lister] if x is not None]
+                )
             n_duplicates += 1
             continue
         papers.append(paper)
