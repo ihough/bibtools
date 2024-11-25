@@ -497,6 +497,8 @@ def generate_wordcloud(
     # * Remove French accents
     # * Standardize some spellings (e.g. 'factorization' -> 'factorisation')
     # * Fix some typos (e.g. 'pm 2:5' -> 'pm2.5')
+    # * Remove formatting e.g. 'pm&amp;lt;sub&amp;gt;10&amp;lt;/sub&amp;gt;' -> 'pm10'
+    # * Replace escaped characters e.g. '&amp;amp;' -> '&'
     # * Remove period from end of words e.g. 'end.' -> 'end'
     text = text.lower()
     text = re.sub("</?jats.+?>", " ", text, flags=re.IGNORECASE)
@@ -506,6 +508,10 @@ def generate_wordcloud(
     text = re.sub(r"\bpm\s+2[\.:]5\b", "PM2.5", text, flags=re.IGNORECASE)
     text = re.sub(r"\bpm\s+10\b", "PM10", text, flags=re.IGNORECASE)
     text = re.sub(r"(\w+)\.(\s|$)", r"\1\2", text)
+    text = re.sub(r"&amp;lt;\/?(i|sub|sup)&amp;gt;", "", text)
+    text = re.sub("(&amp;)?amp;", "&", text, flags=re.IGNORECASE)
+    text = re.sub("(&amp;)?gt;", ">", text, flags=re.IGNORECASE)
+    text = re.sub("(&amp;)?lt;", "<", text, flags=re.IGNORECASE)
 
     cloud = WordCloud(
         width=width,
