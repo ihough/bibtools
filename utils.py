@@ -630,6 +630,8 @@ def papers_to_wordclouds(
     force: bool = False,
     hal_only: bool = False,
     weight: int = 1,
+    width: int = 1000,
+    height: int = 500,
 ) -> WordCloud:
     """Generate wordclouds from paper abstracts and titles"""
 
@@ -659,7 +661,7 @@ def papers_to_wordclouds(
             text += field_text
 
         # Generate and save wordcloud
-        cloud = generate_wordcloud("\n".join(text))
+        cloud = generate_wordcloud("\n".join(text), width=width, height=height)
         cloud.to_file(out_path)
         logger.info("Saved %s", out_path)
 
@@ -708,14 +710,15 @@ def parse_wordcloud_args(description: str | None = None) -> argparse.Namespace:
         action="store_true",
         help="exclude papers that do not have a HAL ID",
     )
+    parser.add_argument("--height", default=500, type=int, help="output height (pixels)")
     parser.add_argument(
-        "-w",
         "--weight",
         default=1,
         type=int,
         help="set this to an integer >1 to give extra weight to papers where a team"
         + "member is the first or corresponding author",
     )
+    parser.add_argument("--width", default=1000, type=int, help="output width (pixels)")
 
     return parser.parse_args()
 

@@ -30,10 +30,10 @@ Generate wordclouds from the titles and abstracts in `papers.csv`, skipping any 
 python csv2wordcloud.py --hal-only --by-theme
 ```
 
-Generate wordclouds from the titles and abstracts in the Google Sheet, giving 3x weight to papers where a team member is first or corresponding author:
+Generate wordclouds from the titles and abstracts in the Google Sheet, giving 3x weight to papers where a team member is first or corresponding author, and setting the output size to 250 x 500 pixels:
 
 ```bash
-python sheets2wordcloud.py --weight 3
+python sheets2wordcloud.py --weight 3 --height 250 --width 500
 ```
 
 Read papers from the Google Sheet, look up BibTeX from [Crossref](https://www.crossref.org/) and [HAL](https://hal.science), and write to `references.bib`:
