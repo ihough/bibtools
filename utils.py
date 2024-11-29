@@ -495,23 +495,25 @@ def generate_wordcloud(
     # * Lowercase
     # * Remove jats tags e.g. <jats:p>
     # * Remove French accents
-    # * Standardize some spellings (e.g. 'factorization' -> 'factorisation')
-    # * Fix some typos (e.g. 'pm 2:5' -> 'pm2.5')
-    # * Remove formatting e.g. 'pm&amp;lt;sub&amp;gt;10&amp;lt;/sub&amp;gt;' -> 'pm10'
-    # * Replace escaped characters e.g. '&amp;amp;' -> '&'
-    # * Remove period from end of words e.g. 'end.' -> 'end'
+    # * Standardize spellings: *isation -> *ization e.g. factorisation -> factorization
+    # * Standardize spellings: *ell(ed|er|ing) -> *el(ed|er|ing) e.g. modelled -> modeled
+    # * Fix PM10 + PM2.5 e.g. pm 2:5 -> pm2.5
+    # * Remove formatting e.g. pm&amp;lt;sub&amp;gt;10&amp;lt;/sub&amp;gt; -> pm10
+    # * Replace escaped characters e.g. &amp;amp; -> &
+    # * Remove period from end of words e.g. end. -> end
     text = text.lower()
     text = re.sub("</?jats.+?>", " ", text, flags=re.IGNORECASE)
     text = text.translate(str.maketrans("àâèéêëîïôùûü", "aaeeeeiiouuu"))
     text = text.translate(str.maketrans("ÀÂÈÉÊËÎÏÔÙÛÜ", "AAEEEEIIOUUU"))
-    text = re.sub(r"zation\b", "sation", text, flags=re.IGNORECASE)
-    text = re.sub(r"\bpm\s+2[\.:]5\b", "PM2.5", text, flags=re.IGNORECASE)
-    text = re.sub(r"\bpm\s+10\b", "PM10", text, flags=re.IGNORECASE)
-    text = re.sub(r"(\w+)\.(\s|$)", r"\1\2", text)
+    text = re.sub(r"isation\b", r"ization", text, flags=re.IGNORECASE)
+    text = re.sub(r"ell(ed|er|ing)\b", r"el\1", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bpm\s*2[\.:]5\b", "PM2.5", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bpm\s*10\b", "PM10", text, flags=re.IGNORECASE)
     text = re.sub(r"&amp;lt;\/?(i|sub|sup)&amp;gt;", "", text)
     text = re.sub("(&amp;)?amp;", "&", text, flags=re.IGNORECASE)
     text = re.sub("(&amp;)?gt;", ">", text, flags=re.IGNORECASE)
     text = re.sub("(&amp;)?lt;", "<", text, flags=re.IGNORECASE)
+    text = re.sub(r"(\w+)\.(\s|$)", r"\1\2", text)
 
     cloud = WordCloud(
         width=width,
