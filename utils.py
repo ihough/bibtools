@@ -632,6 +632,7 @@ def papers_to_wordclouds(
     weight: int = 1,
     width: int = 1000,
     height: int = 500,
+    collocations: bool = True,
 ) -> WordCloud:
     """Generate wordclouds from paper abstracts and titles"""
 
@@ -661,7 +662,9 @@ def papers_to_wordclouds(
             text += field_text
 
         # Generate and save wordcloud
-        cloud = generate_wordcloud("\n".join(text), width=width, height=height)
+        cloud = generate_wordcloud(
+            ".\n".join(text), width=width, height=height, collocations=collocations
+        )
         cloud.to_file(out_path)
         logger.info("Saved %s", out_path)
 
@@ -712,11 +715,16 @@ def parse_wordcloud_args(description: str | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--height", default=500, type=int, help="output height (pixels)")
     parser.add_argument(
+        "--unigrams",
+        action="store_true",
+        help="only consider individual words (no collocations)",
+    )
+    parser.add_argument(
         "--weight",
         default=1,
         type=int,
         help="set this to an integer >1 to give extra weight to papers where a team"
-        + "member is the first or corresponding author",
+        + " member is the first or corresponding author",
     )
     parser.add_argument("--width", default=1000, type=int, help="output width (pixels)")
 

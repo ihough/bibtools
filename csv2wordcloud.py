@@ -25,6 +25,7 @@ def csv2wordcloud(args: dict) -> None:
         weight=args.weight,
         height=args.height,
         width=args.width,
+        collocations=not args.unigrams,
     )
 
 
