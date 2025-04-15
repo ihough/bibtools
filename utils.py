@@ -74,7 +74,7 @@ class Paper:
     _rate_limit: int = field(init=False, repr=False, default=50)
 
     def __post_init__(self) -> None:
-        self.doi = self.parse_doi(self.doi)
+        self.doi = parse_doi(self.doi, raise_on_fail=True)
         self.hal_id = self.parse_hal_id(self.hal_id)
         if not self.has_doi() and not self.has_hal_id():
             raise ValueError("Paper must have DOI or HAL ID; got neither.")
@@ -403,41 +403,6 @@ class Paper:
         self.journal = info.get("journal")
         self.abstract = info.get("abstract")
 
-    def parse_doi(self, doi: str) -> str | None:
-        """Parse a DOI or DOI link and return the standardized DOI
-
-        Recognized formats:
-            - <DOI>
-            - http[s]://[dx.]doi.org/<DOI>
-            - http[s]://doi-org.<subdomain>.grenet.fr/<DOI>
-            - http[s]://<domain and path>/doi/[full/]/<DOI>
-            - 'no doi'
-        """
-
-        if doi is None or doi.strip() == "":
-            return None
-        doi = doi.lower().strip()
-
-        doi_pattern = r"(10\.\d{4}.+)"
-        patterns = [
-            # <DOI>
-            r"^" + doi_pattern,
-            # [dx.]doi.org/<DOI>
-            r"^https?:\/\/(?:dx\.)?doi\.org\/" + doi_pattern,
-            # doi-org.*.grenet.fr/<DOI>
-            r"^https?:\/\/doi-org\.[\w-]+\.grenet\.fr\/" + doi_pattern,
-            # */doi/[full/]/<DOI>
-            r"^https?:\/\/[\w\.]+\/doi\/(?:full\/)" + doi_pattern,
-            # Paper has no DOI
-            r"^(no doi)$",
-        ]
-        for pattern in patterns:
-            if re.match(pattern, doi):
-                doi = re.sub(pattern, r"\1", doi)
-                return doi
-
-        raise ValueError(f"Unrecognized DOI: {doi}")
-
     def parse_hal_id(self, hal_id: str) -> str | None:
         """Parse a HAL ID or link and return the standardized HAL ID
 
@@ -693,6 +658,47 @@ def papers_to_wordclouds(
         make_wordcloud(theme_papers, fields="abstract", suffix=suffix)
         make_wordcloud(theme_papers, fields="title", suffix=suffix)
         make_wordcloud(theme_papers, fields=["abstract", "title"], suffix=suffix)
+
+
+def parse_doi(doi: str, raise_on_fail: bool = False) -> str | None:
+    """Parse a DOI and return in a standardized format
+
+    Args:
+        doi: The DOI to parse
+        raise_on_fail: Whether to raise an error if the input is not a recognized DOI
+
+    Recognized DOI formats:
+        - <DOI>
+        - http[s]://[dx.]doi.org/<DOI>
+        - http[s]://doi-org.<subdomain>.grenet.fr/<DOI>
+        - http[s]://<domain and path>/doi/[full/]/<DOI>
+        - 'no doi'
+    """
+
+    if doi is None or doi.strip() == "":
+        return None
+    doi = doi.lower().strip()
+
+    doi_pattern = r"(10\.\d{4}.+)"
+    patterns = [
+        # <DOI>
+        r"^" + doi_pattern,
+        # [dx.]doi.org/<DOI>
+        r"^https?:\/\/(?:dx\.)?doi\.org\/" + doi_pattern,
+        # doi-org.*.grenet.fr/<DOI>
+        r"^https?:\/\/doi-org\.[\w-]+\.grenet\.fr\/" + doi_pattern,
+        # */doi/[full/]/<DOI>
+        r"^https?:\/\/[\w\.]+\/doi\/(?:full\/)" + doi_pattern,
+        # No DOI indicator
+        r"^(no doi)$",
+    ]
+    for pattern in patterns:
+        if re.match(pattern, doi):
+            doi = re.sub(pattern, r"\1", doi)
+            return doi
+
+    if raise_on_fail:
+        raise ValueError(f"Unrecognized DOI: {doi}")
 
 
 def parse_wordcloud_args(description: str | None = None) -> argparse.Namespace:
