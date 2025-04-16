@@ -1,10 +1,15 @@
 # Authentication keys
 keys/
 
-# Output files
+# Input and output files
+*.bib
+*.csv
 *.png
-papers.csv
-references.bib
+*.txt
 
 # Requests cache
 bibtools_cache.sqlite
+
+# VSCode
+.vscode/
+activate
