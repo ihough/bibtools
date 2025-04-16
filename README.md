@@ -65,7 +65,7 @@ pip install .
 
 * Set the URL of the Google Sheet listing the publications
 
-* Optionally set the email to use for the [Crossref API](https://www.crossref.org/documentation/retrieve-metadata/rest-api/tips-for-using-the-crossref-rest-api/#pick-the-right-service-level). This will allow bibtools to use crossref's "polite" API pool. Crossref will only use the email to contact you in the unlikely event that bibtools causes a problem on their servers. If you don't configure an email, bibtools will try to use your git email (from `git config user.email`). If that fails, bibtools will use crossref's "public" API pool which may be less reliable.
+* Optionally set a contact email to include in the User-Agent header of API requests. This allows API providers to contact you if the bibtools scripts cause issues with their service. Currently, the header is only used for queries to [Crossref](https://www.crossref.org/), who routes queries with contact information to a less-congested ["polite" API pool](https://github.com/CrossRef/rest-api-doc#good-manners--more-reliable-service). If you don't configure an email, bibtools will try to use your git email (from `git config user.email`).
 
 ### Configure the Google Sheets API
 

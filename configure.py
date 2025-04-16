@@ -22,36 +22,36 @@ class Configure:
         except IndexError:
             raise FileNotFoundError(f"No json key found in {self.KEYS_DIR}/")
 
-        # Email for polite crossref queries; if unset will be configured on first access
-        self._crossref_email = config.get("crossref_email")
-        self._crossref_email_configured = self._crossref_email is not None
+        # Contact email for 'polite' Crossref queries
+        self._contact_email = config.get("contact_email")
+        self._contact_email_configured = self._contact_email is not None
 
         # Scopus API key; will be configured on first access
         self._scopus_key = None
         self._scopus_key_configured = False
 
     @property
-    def crossref_email(self) -> str:
-        """Email for polite crossref queries"""
+    def contact_email(self) -> str:
+        """Contact email to enable 'polite' Crossref queries"""
 
         # Configure on first run
-        if not self._crossref_email_configured:
-            msg = "Crossref email not configured; using impolite crossref queries"
+        if not self._contact_email_configured:
+            msg = "Contact email not configured; using impolite crossref queries"
             try:
                 result = subprocess.run(
                     ["git", "config", "user.email"], capture_output=True, check=False
                 )
                 if result.returncode == 0:
                     email = result.stdout.decode("utf-8").strip()
-                    self._crossref_email = email
+                    self._contact_email = email
                     msg = f"Using git email ({email}) for polite crossref queries"
             except FileNotFoundError:
                 pass  # don't raise if git not found
 
             warn(msg)
-            self._crossref_email_configured = True
+            self._contact_email_configured = True
 
-        return self._crossref_email
+        return self._contact_email
 
     @property
     def scopus_key(self) -> str | None:

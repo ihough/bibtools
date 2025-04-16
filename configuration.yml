@@ -3,7 +3,8 @@
 # section of README.md for details.
 sheet_url: null
 
-# Email to include in crossref queries (for politeness). If unset, bibtools will
-# try to use your git email (from `git config user.email`). For more info see
-# https://www.crossref.org/documentation/retrieve-metadata/rest-api/tips-for-using-the-crossref-rest-api/
-crossref_email: null
+# Email to include in API queries. Configuring this allows you to use Crossref's
+# less-congested 'polite' API pool. If unset, bibtools will try to use your git
+# email (from `git config user.email`). For more info see
+# https://github.com/CrossRef/rest-api-doc#good-manners--more-reliable-service
+contact_email: null

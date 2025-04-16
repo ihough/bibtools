@@ -41,8 +41,51 @@ PAPER_TO_SHEET = {
 requests_cache.install_cache("bibtools_cache", backend="sqlite")
 
 
+@dataclass()
+class Requester:
+    """Parent class for shared methods relating to issuing REST API requests"""
+
+    rate_limit: int = field(init=False, repr=False, default=50)
+
+    def check_ratelimit(self, response: requests.Response) -> int:
+        """Warn if the response rate limit has changed"""
+
+        limit = int(
+            int(response.headers.get("x-ratelimit-limit", self.rate_limit))
+            / int(response.headers.get("x-ratelimit-interval", "1s")[:-1])
+        )
+        if limit != self.rate_limit:
+            warn(f"API rate limit changed from {self.rate_limit}/sec to {limit}/sec")
+            self.rate_limit = limit
+
+    def get(
+        self, url: str, headers: dict | None = None, timeout: int = 10
+    ) -> requests.Response:
+        """GET a url and raise if request times out or status != 200"""
+
+        # Add User-Agent header with contact email, if configured, to Crossref queries
+        # This routes queries to Crossref's 'polite' API pool. For details see
+        # https://github.com/CrossRef/rest-api-doc#good-manners--more-reliable-service
+        if "api.crossref.org" in url:
+            if headers is None:
+                headers = self.user_agent_header()
+            elif self.user_agent_header() is not None:
+                headers |= self.user_agent_header()
+
+        try:
+            return requests.get(url, headers=headers, timeout=timeout)
+        except requests.exceptions.ReadTimeout as err:
+            raise requests.exceptions.Timeout(f"Timed out querying {url}") from err
+
+    def user_agent_header(self) -> dict | None:
+        """Return User-Agent header with contact email, if configured"""
+
+        if CONFIG.contact_email is not None:
+            return {"User-Agent": f"bibtools/0.0.1 (mailto:{CONFIG.contact_email})"}
+
+
 @dataclass(kw_only=True)
-class Paper:
+class Paper(Requester):
     """Class to represent a scientific publication
 
     Args:
@@ -69,13 +112,12 @@ class Paper:
     year: int | None = None
     is_main: bool | str = False
     theme: int | None = None
-    lister: str | None = field(repr=False, default=None)
-    note: str | None = field(repr=False, default=None)
-    title: str | None = field(repr=False, default=None)
-    journal: str | None = field(repr=False, default=None)
-    orcid: str | None = field(repr=False, default=None)
-    abstract: str | None = field(repr=False, default=None)
-    _rate_limit: int = field(init=False, repr=False, default=50)
+    lister: str | None = field(default=None, repr=False)
+    note: str | None = field(default=None, repr=False)
+    title: str | None = field(default=None, repr=False)
+    journal: str | None = field(default=None, repr=False)
+    orcid: str | None = field(default=None, repr=False)
+    abstract: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         self.doi = parse_doi(self.doi, raise_on_fail=True)
@@ -84,22 +126,6 @@ class Paper:
             raise ValueError("Paper must have DOI or HAL ID; got neither.")
 
         self.is_main = str(self.is_main).strip().lower() in ["true", "yes", "y", "oui"]
-
-    def _get(self, url: str, headers: str = None, timeout: int = 10) -> requests.Response:
-        """GET a url and raise if request times out or status != 200"""
-
-        try:
-            return requests.get(url, headers=headers, timeout=timeout)
-        except requests.exceptions.ReadTimeout as err:
-            raise requests.exceptions.Timeout(f"Timed out querying {url}") from err
-
-    def crossref_headers(self) -> dict | None:
-        """Possibly return User-Agent header for polite crossref queries"""
-
-        if CONFIG.crossref_email is not None:
-            return {"User-Agent": f"bibtools/0.0.1 (mailto:{CONFIG.crossref_email})"}
-
-        return None
 
     def doi_link(self) -> str | None:
         """Return the DOI link e.g. https://doi.org/10.1000/182"""
@@ -125,7 +151,7 @@ class Paper:
             + f"?apiKey={CONFIG.scopus_key}&field=dc:description"
         )
         headers = {"Accept": "application/json"}
-        response = self._get(url, headers)
+        response = self.get(url, headers)
 
         if response.status_code == 404:
             return None
@@ -148,7 +174,7 @@ class Paper:
             f"https://api.semanticscholar.org/graph/v1/paper/DOI:{self.doi}"
             + "?fields=abstract"
         )
-        response = self._get(url)
+        response = self.get(url)
 
         if response.status_code == 404:
             return None
@@ -181,9 +207,7 @@ class Paper:
 
         url = f"https://api.crossref.org/works/{self.doi}/transform"
         headers = {"Accept": "application/x-bibtex"}
-        if self.crossref_headers() is not None:
-            headers |= self.crossref_headers()
-        response = self._get(url, headers=headers)
+        response = self.get(url, headers=headers)
 
         # If not found, return an error comment in BibTeX format
         if response.status_code == 404:
@@ -200,7 +224,7 @@ class Paper:
         url = (
             f"https://api.archives-ouvertes.fr/search/?q=halId_id:{self.hal_id}&wt=bibtex"
         )
-        response = self._get(url)
+        response = self.get(url)
 
         if response.status_code != 200:
             raise ValueError(f"Error: status {response.status_code} from {url}")
@@ -227,7 +251,7 @@ class Paper:
         """
 
         url = f"https://api.crossref.org/works/{self.doi}"
-        response = self._get(url, headers=self.crossref_headers())
+        response = self.get(url)
 
         # Return if DOI not found
         if response.status_code == 404:
@@ -237,17 +261,9 @@ class Paper:
             raise ValueError(f"Error: status {response.status_code} from {url}")
 
         # Monitor the API rate limit
-        rate_limit = int(
-            int(response.headers["x-ratelimit-limit"])
-            / int(response.headers["x-ratelimit-interval"][:-1])
-        )
-        if rate_limit != self._rate_limit:
-            warn(
-                f"Crossref API rate limit changed from {self._rate_limit}/sec to"
-                + f" {rate_limit}/sec."
-            )
-            self._rate_limit = rate_limit
+        self.check_ratelimit(response)
 
+        # Parse response
         data = response.json()["message"]
         details = {
             "doi": data["DOI"],
@@ -271,7 +287,7 @@ class Paper:
         """Query datacite.org with a DOI and return details"""
 
         url = f"https://api.datacite.org/dois/{self.doi}"
-        response = self._get(url, headers=self.crossref_headers())
+        response = self.get(url)
 
         # Return if DOI not found
         if response.status_code == 404:
@@ -316,7 +332,7 @@ class Paper:
             + ",authFirstName_s,authLastName_s,producedDateY_i,title_s,journalTitle_s"
             + ",abstract_s"
         )
-        response = self._get(url)
+        response = self.get(url)
 
         if response.status_code != 200:
             raise ValueError(f"Error: status {response.status_code} from {url}")
