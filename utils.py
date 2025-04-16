@@ -134,6 +134,14 @@ class Paper(Requester):
             return f"https://doi.org/{self.doi}"
         return None
 
+    # Recommended by https://www.crossref.org/documentation/retrieve-metadata/rest-api/tips-for-using-the-crossref-rest-api/#optimize-your-requests-and-pay-attention-to-errors
+    def encode_doi(self) -> str:
+        """Return the URL-encoded DOI"""
+
+        if self.has_doi():
+            return requests.utils.quote(self.doi)
+        return None
+
     def get_abstract_scopus(self) -> str:
         """Query Scopus for paper abstract
 
@@ -147,7 +155,7 @@ class Paper(Requester):
             return None
 
         url = (
-            f"https://api.elsevier.com/content/article/doi/{self.doi}"
+            f"https://api.elsevier.com/content/article/doi/{self.encode_doi()}"
             + f"?apiKey={CONFIG.scopus_key}&field=dc:description"
         )
         headers = {"Accept": "application/json"}
@@ -171,7 +179,7 @@ class Paper(Requester):
         """
 
         url = (
-            f"https://api.semanticscholar.org/graph/v1/paper/DOI:{self.doi}"
+            f"https://api.semanticscholar.org/graph/v1/paper/DOI:{self.encode_doi()}"
             + "?fields=abstract"
         )
         response = self.get(url)
@@ -205,7 +213,7 @@ class Paper(Requester):
     def get_bibtex_crossref(self) -> str:
         """Query crossref.org with the paper's DOI and return a BibTeX entry"""
 
-        url = f"https://api.crossref.org/works/{self.doi}/transform"
+        url = f"https://api.crossref.org/works/{self.encode_doi()}/transform"
         headers = {"Accept": "application/x-bibtex"}
         response = self.get(url, headers=headers)
 
@@ -250,7 +258,9 @@ class Paper(Requester):
         See https://citation.crosscite.org/docs.html for details.
         """
 
-        url = f"https://api.crossref.org/works/{self.doi}"
+        # Note: this does not allow choosing which fields are returned but is still much
+        # faster than alternative of querying 'works?filter=doi:DOI&rows=1&select=...'
+        url = f"https://api.crossref.org/works/{self.encode_doi()}"
         response = self.get(url)
 
         # Return if DOI not found
@@ -286,7 +296,7 @@ class Paper(Requester):
     def get_details_datacite(self) -> dict:
         """Query datacite.org with a DOI and return details"""
 
-        url = f"https://api.datacite.org/dois/{self.doi}"
+        url = f"https://api.datacite.org/dois/{self.encode_doi()}"
         response = self.get(url)
 
         # Return if DOI not found
@@ -326,7 +336,7 @@ class Paper(Requester):
         # * Do not get author ORCID (authORCIDIdExt_s) because it does not include entries
         #   for authors whose ORCID is unknown. This means that the first ORCID may not
         #   belong to the first author.
-        query = self.hal_id if self.has_hal_id() else f"doiId_id:{self.doi}"
+        query = self.hal_id if self.has_hal_id() else f"doiId_id:{self.encode_doi()}"
         url = (
             f"https://api.archives-ouvertes.fr/search/?q={query}&fl=doiId_s,halId_s"
             + ",authFirstName_s,authLastName_s,producedDateY_i,title_s,journalTitle_s"
