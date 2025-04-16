@@ -26,7 +26,7 @@ PAPER_TO_SHEET = {
     "lister": "Team member listing the paper / HDR / thesis / book / chapter / other",
     "doi": "DOI link",
     "hal_id": "HAL link",
-    "is_main": "Is a team member the first or corresponding author?",
+    "is_main": "Is a team member the first or corresponding author (or last author)?",
     "theme": "Theme",
     "note": "Note",
     "title": "Title",
