@@ -84,6 +84,161 @@ class Requester:
             return {"User-Agent": f"bibtools/0.0.1 (mailto:{CONFIG.contact_email})"}
 
 
+@dataclass()
+class Reference(Requester):
+    """Class to represent a reference identifying a scientific publication
+
+    Args:
+        text: Text of the reference
+    """
+
+    text: str
+    doi: str | None = None
+    citekey: str | None = None
+    year: str | None = None
+    title: str | None = None
+    journal: str | None = None
+    score: float | None = None
+
+    def __repr__(self) -> str:
+        if self.score is not None:
+            return (
+                "Reference("
+                + f"  citekey: '{self.citekey}'\n"
+                + f"  score: {round(self.score, 1)}\n"
+                + f"  doi: '{self.doi}'\n"
+                + f"  title: '{self.title}'\n"
+                + f"  journal: '{self.journal}'\n"
+                + ")"
+            )
+        return f"Reference(text='{self.text}')"
+
+    def encode_text(self) -> str:
+        """Return the URL-encoded text"""
+
+        return requests.utils.quote(self.text)
+
+    def format_author(self, item: dict) -> str:
+        """Return family name + initials for first author of a crossref item"""
+
+        author = item.get("author", [{}])[0]
+        family = author.get("family")
+        given = author.get("given", "")
+        if not any(author) or not any([family, given]):
+            msg = "\n  ".join(
+                [
+                    "Match has no author:",
+                    f"Query: {self.text}",
+                    f"Match:  {self.format_crossref_item(item)} {item['DOI']}",
+                ]
+            )
+            warn(msg)
+            return ""
+
+        initials = []
+        for part in given.split():
+            initials.append("-".join([x[0].upper() + "." for x in part.split("-")]))
+        initials = " ".join(initials)
+
+        return " ".join([x for x in [family, initials] if x is not None])
+
+    def format_citekey(self, item: dict) -> str:
+        """Return a citation key for a crossref item"""
+
+        author = item.get("author", [{}])[0]
+        author = author.get("family", "NoAuthor")
+        year = item["issued"]["date-parts"][0][0]
+        if year is None:
+            year = "NoYear"
+
+        return author + str(year)
+
+    def format_crossref_item(self, item: dict) -> str:
+        """Return a text summary of a crossref item"""
+
+        return " ".join([self.format_citekey(item), item["title"][0]])
+
+    def lookup_details(self) -> None:
+        """Get and set bibliographic details from crossref.org"""
+
+        # Limit to 2 responses as suggested by
+        # https://www.crossref.org/documentation/retrieve-metadata/rest-api/tips-for-using-the-crossref-rest-api/
+        url = (
+            f'https://api.crossref.org/works?query.bibliographic="{self.encode_text()}"'
+            + "&rows=2&select=score,DOI,author,issued,title,container-title,type"
+        )
+        response = self.get(url, timeout=20)
+
+        if response.status_code == 404:
+            return None
+        if response.status_code != 200:
+            raise ValueError(f"Error: status {response.status_code} from {url}")
+
+        # Monitor the API rate limit
+        self.check_ratelimit(response)
+
+        # Check the response
+        items = response.json()["message"]["items"]
+        if not any(items):
+            warn(f"No matches for '{self.text}'")
+            return None
+
+        # Compute normalized score for each match as suggested by
+        # https://community.crossref.org/t/query-affiliation/2009/5
+        scores = [x["score"] / len(self.text.split()) for x in items]
+
+        # Skip if top two matches are tied
+        if len(items) > 1 and scores[0] == scores[1]:
+            msg = "\n  ".join(
+                [
+                    f"Top matches have same score ({scores[0]}); skipping:",
+                    f"Query: {self.text}",
+                    f"Best:  {self.format_crossref_item(items[0])} {items[0]['DOI']}",
+                    f"Next:  {self.format_crossref_item(items[1])} {items[1]['DOI']}",
+                ]
+            )
+            warn(msg)
+            return None
+
+        # Skip first match if it is a component e.g. supplemental information, figure
+        if items[0]["type"] == "component":
+            msg = "\n  ".join(
+                [
+                    "Best match is a component; using next-best match",
+                    f"Query: {self.text}",
+                    f"Best:  {self.format_crossref_item(items[0])} {items[0]['DOI']}",
+                    f"Next:  {self.format_crossref_item(items[1])} {items[1]['DOI']}",
+                ]
+            )
+            warn(msg)
+            items = items[1:]
+            scores = scores[1:]
+
+        # Warn if best match has low normalized score
+        if scores[0] < 3:
+            msg = "\n  ".join(
+                [
+                    f"Match has low normalized score ({scores[0]})",
+                    f"Query: {self.text}",
+                    f"Match: {self.format_crossref_item(items[0])} {items[0]['DOI']}",
+                ]
+            )
+            warn(msg)
+
+        # Extract and set details
+        match = items[0]
+        self.doi = match["DOI"]
+        self.citekey = self.format_citekey(match)
+        self.title = re.sub(r"\s+", " ", match["title"][0]).strip()
+        self.author = self.format_author(match)
+        self.year = match["issued"]["date-parts"][0][0]
+        journal = match.get("container-title", [None])[0]
+        if journal is not None:
+            journal = journal.replace("&amp;", "&")
+        self.journal = journal
+        self.score = scores[0]
+
+
 @dataclass(kw_only=True)
 class Paper(Requester):
     """Class to represent a scientific publication
@@ -621,6 +776,12 @@ def get_sheet_papers() -> list[Paper]:
     return papers
 
 
+def get_txt_references(path: Path | str) -> list[Reference]:
+    """Read references from a text file"""
+
+    return [Reference(ref) for ref in read_txt(path)]
+
+
 def papers_to_wordclouds(
     papers: list[Paper],
     by_theme: bool = False,
@@ -750,6 +911,22 @@ def read_csv(path: str = None, validate: bool = True) -> pd.DataFrame:
         raise ValueError(f"No papers found in {path}")
 
     return papers_df
+
+
+def read_txt(path: Path | str) -> list[str]:
+    """Read references from a text file
+
+    The file must have a single reference on each line
+    """
+
+    path = Path(path).resolve()
+    logger.info("Reading %s", path)
+    papers = path.read_text().splitlines()
+
+    # Deduplicate
+    papers = list(dict.fromkeys(papers))
+
+    return papers
 
 
 def validate_csv(csv: pd.DataFrame) -> None:
