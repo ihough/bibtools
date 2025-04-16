@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Read papers from Google Sheet, lookup bibliographic details, and write to CSV"""
+"""Read papers from Google Sheet, lookup bibliographic details, and write to CSV file"""
 
 import argparse
 import csv
@@ -13,22 +13,25 @@ from utils import get_sheet_papers, PAPER_TO_SHEET
 logger = logging.getLogger(__name__)
 
 
-def sheets2csv(force: bool = False, no_lookup: bool = False) -> None:
-    """Read papers from Google Sheet, lookup bibliographic details, and write to CSV"""
+def sheets2csv(out_path: Path, force: bool = False, no_lookup: bool = False) -> None:
+    """Read papers from Google Sheet, lookup bibliographic details, and write to a CSV"""
 
-    csv_path = Path("papers.csv")
-    if csv_path.exists() and not force:
-        raise ValueError(f"File exists: {csv_path}. Use --force to overwrite.")
+    if out_path.exists() and not force:
+        raise ValueError(f"File exists: {out_path}. Use --force to overwrite.")
 
     # Read deduplicated papers from the Google Sheet
     papers = get_sheet_papers()
+
+    if not any(papers):
+        logger.info("No papers found in Google Sheet")
+        return None
 
     # Possibly crossref or hal.science for paper details and write to CSV
     if no_lookup:
         logger.info("Skipping lookup of missing details")
     else:
         logger.info("Looking up bibliographic details for %s papers", len(papers))
-    with csv_path.open(mode="w", newline="", encoding="utf-8") as file:
+    with out_path.open(mode="w", newline="", encoding="utf-8") as file:
         # Write header row
         writer = csv.writer(file, dialect="unix")
         writer.writerow(PAPER_TO_SHEET.keys())
@@ -68,23 +71,29 @@ def sheets2csv(force: bool = False, no_lookup: bool = False) -> None:
     if n_duplicates > 0:
         logger.info("Merged %s duplicates", n_duplicates)
 
-    logger.info("Paper details written to %s", csv_path)
+    logger.info("Paper details written to %s", out_path)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Read papers from the Google Sheet, look up bibliographic details and"
-        + " abstracts from Crossref, HAL, Semantic Scholar, and SCOPUS, and write to"
-        + " papers.csv"
+        description="Read papers from a Google Sheet, look up bibliographic details and"
+        + " abstracts from Crossref, HAL, Semantic Scholar, and SCOPUS, and write to CSV"
     )
     parser.add_argument(
-        "-f", "--force", action="store_true", help="overwrite existing papers.csv file"
+        "-f", "--force", action="store_true", help="overwrite existing output CSV file"
     )
     parser.add_argument(
         "--no-lookup", action="store_true", help="do not look up missing details"
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="display DEBUG level messages"
+    )
+    parser.add_argument(
+        "out_path",
+        nargs="?",
+        default="papers.csv",
+        type=Path,
+        help="Path to output CSV file (default: papers.csv)",
     )
     args = parser.parse_args()
 
@@ -94,4 +103,4 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO,
     )
 
-    sheets2csv(force=args.force, no_lookup=args.no_lookup)
+    sheets2csv(out_path=args.out_path, force=args.force, no_lookup=args.no_lookup)

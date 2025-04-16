@@ -532,10 +532,10 @@ def get_sheet(write: bool = False) -> gspread.Worksheet:
     return sheet
 
 
-def get_csv_papers() -> list[Paper]:
+def get_csv_papers(path: str, validate: bool = True) -> list[Paper]:
     """Read papers from a CSV"""
 
-    papers_df = read_csv()
+    papers_df = read_csv(path=path, validate=validate)
     papers = [Paper(**row) for _, row in papers_df.iterrows()]
 
     return papers
@@ -705,62 +705,23 @@ def parse_doi(doi: str, raise_on_fail: bool = False) -> str | None:
         raise ValueError(f"Unrecognized DOI: {doi}")
 
 
-def parse_wordcloud_args(description: str | None = None) -> argparse.Namespace:
-    """Parse command-line arguments for wordclouds"""
-
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument(
-        "--by-theme",
-        action="store_true",
-        help="generate separate wordclouds for each research theme",
-    )
-    parser.add_argument(
-        "-f",
-        "--force",
-        action="store_true",
-        help="overwrite existing wordcloud_*.png files",
-    )
-    parser.add_argument(
-        "--hal-only",
-        action="store_true",
-        help="exclude papers that do not have a HAL ID",
-    )
-    parser.add_argument("--height", default=500, type=int, help="output height (pixels)")
-    parser.add_argument(
-        "--unigrams",
-        action="store_true",
-        help="only consider individual words (no collocations)",
-    )
-    parser.add_argument(
-        "--weight",
-        default=1,
-        type=int,
-        help="set this to an integer >1 to give extra weight to papers where a team"
-        + " member is the first or corresponding author",
-    )
-    parser.add_argument("--width", default=1000, type=int, help="output width (pixels)")
-
-    return parser.parse_args()
-
-
-def read_csv(validate: bool = True) -> pd.DataFrame:
-    """Read paper bibliographic details from papers.csv
+def read_csv(path: str = None, validate: bool = True) -> pd.DataFrame:
+    """Read paper bibliographic details from a CSV
 
     Args:
         validate: Whether to check the CSV layout (default: True)
     """
 
     # Read CSV
-    csv_path = Path("papers.csv")
-    logger.info("Reading %s", csv_path)
-    papers_df = pd.read_csv(csv_path).replace({float("nan"): None})
+    logger.info("Reading %s", path)
+    papers_df = pd.read_csv(path).replace({float("nan"): None})
 
     # Possibly confirm the CSV has the expected layout
     if validate:
         validate_csv(papers_df)
 
     if papers_df.shape[0] == 0:
-        raise ValueError(f"No papers found in {csv_path}")
+        raise ValueError(f"No papers found in {path}")
 
     return papers_df
 
@@ -789,3 +750,44 @@ def validate_sheet(sheet: gspread.Worksheet) -> None:
                 "Unrecognized sheet layout."
                 + f" Cell {cell} should contain '{expected}'; got '{actual}'."
             )
+
+
+def wordcloud_argparser(description: str | None = None) -> argparse.ArgumentParser:
+    """Return a parser that for command-line arguments for wordclouds"""
+
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument(
+        "--by-theme",
+        action="store_true",
+        help="generate separate wordclouds for each research theme",
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="overwrite existing wordcloud_*.png files",
+    )
+    parser.add_argument(
+        "--hal-only",
+        action="store_true",
+        help="exclude papers that do not have a HAL ID",
+    )
+    parser.add_argument("--height", default=500, type=int, help="output height (pixels)")
+    parser.add_argument(
+        "--unigrams",
+        action="store_true",
+        help="only consider individual words (no collocations)",
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="display DEBUG level messages"
+    )
+    parser.add_argument(
+        "--weight",
+        default=1,
+        type=int,
+        help="set this to an integer >1 to give extra weight to papers where a team"
+        + " member is the first or corresponding author",
+    )
+    parser.add_argument("--width", default=1000, type=int, help="output width (pixels)")
+
+    return parser

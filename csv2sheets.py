@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Update Google Sheet with paper bibliographic details from a CSV"""
+"""Update Google Sheet with paper bibliographic details from a CSV file"""
 
 import argparse
 import logging
@@ -11,11 +11,15 @@ from utils import read_csv, get_sheet, PAPER_TO_SHEET
 logger = logging.getLogger(__name__)
 
 
-def csv2sheets():
-    """Update Google Sheet with paper bibliographic details from a CSV"""
+def csv2sheets(csv_path: str):
+    """Update Google Sheet with paper bibliographic details from a CSV file"""
 
     # Read papers from the CSV
-    papers_df = read_csv()
+    papers_df = read_csv(csv_path)
+
+    if len(papers_df) == 0:
+        logger.info("No papers found in %s", csv_path)
+        return None
 
     # Convert DOI and HAL ID to links
     papers_df["doi"] = papers_df["doi"].apply(
@@ -46,11 +50,12 @@ def csv2sheets():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Update the Google Sheet with bibliographic details from papers.csv"
+        description="Update the Google Sheet with bibliographic details from a CSV file"
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="display DEBUG level messages"
     )
+    parser.add_argument("csv_path", help="Path to CSV file listing papers")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -59,4 +64,4 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO,
     )
 
-    csv2sheets()
+    csv2sheets(args.csv_path)

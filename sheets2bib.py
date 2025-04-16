@@ -12,19 +12,22 @@ from utils import get_sheet_papers
 logger = logging.getLogger(__name__)
 
 
-def sheets2bib(force: bool = False) -> None:
+def sheets2bib(out_path: Path, force: bool = False) -> None:
     """Read papers from Google Sheet, lookup details, and write to BibTeX file"""
 
-    bib_path = Path("references.bib")
-    if bib_path.exists() and not force:
-        raise ValueError(f"File exists: {bib_path}. Use --force to overwrite.")
+    if out_path.exists() and not force:
+        raise ValueError(f"File exists: {out_path}. Use --force to overwrite.")
 
     # Read deduplicated papers from the Google Sheet
     papers = get_sheet_papers()
 
-    # Query crossref or hal.science for paper BibTeX and write to .bib file
+    if not any(papers):
+        logger.info("No papers found in Google Sheet")
+        return None
+
+    # Query crossref or hal.science for paper BibTeX and write to output file
     logger.info("Getting BibTeX for %s papers", len(papers))
-    with bib_path.open(mode="w", encoding="utf-8") as file:
+    with out_path.open(mode="w", encoding="utf-8") as file:
         dois = set()
         hal_ids = set()
         n_duplicates = 0
@@ -52,22 +55,26 @@ def sheets2bib(force: bool = False) -> None:
     if n_duplicates > 0:
         logger.info("Skipped %s duplicates", n_duplicates)
 
-    logger.info("BibTeX written to %s", bib_path)
+    logger.info("BibTeX written to %s", out_path)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Read papers from the Google Sheet, look up BibTeX from Crossref and"
-        + " HAL, and write to references.bib"
+        description="Read papers from a Google Sheet, look up BibTeX from Crossref and"
+        + " HAL, and write to a BibTeX file"
     )
     parser.add_argument(
-        "-f",
-        "--force",
-        action="store_true",
-        help="overwrite existing references.bib file",
+        "-f", "--force", action="store_true", help="overwrite existing output BibTeX file"
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="display DEBUG level messages"
+    )
+    parser.add_argument(
+        "out_path",
+        nargs="?",
+        default="references.bib",
+        type=Path,
+        help="Path to output BibTeX file (default: references.bib)",
     )
     args = parser.parse_args()
 
@@ -77,4 +84,4 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO,
     )
 
-    sheets2bib(force=args.force)
+    sheets2bib(out_path=args.out_path, force=args.force)

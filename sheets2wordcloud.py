@@ -2,15 +2,16 @@
 
 """Read paper titles and abstracts from Google Sheet and generate wordclouds"""
 
+import argparse
 import logging
 
-from utils import get_sheet_papers, papers_to_wordclouds, parse_wordcloud_args
+from utils import get_sheet_papers, papers_to_wordclouds, wordcloud_argparser
 
 
 logger = logging.getLogger(__name__)
 
 
-def sheets2wordcloud(args: dict) -> None:
+def sheets2wordcloud(args: argparse.Namespace) -> None:
     """Read paper titles and abstracts from Google Sheet and generate wordclouds"""
 
     # Read papers from Google Sheet
@@ -30,9 +31,10 @@ def sheets2wordcloud(args: dict) -> None:
 
 
 if __name__ == "__main__":
-    args = parse_wordcloud_args(
+    parser = wordcloud_argparser(
         description="Generate wordclouds from the titles and abstracts in the Google Sheet"
     )
+    args = parser.parse_args()
 
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(message)s",

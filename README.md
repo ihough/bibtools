@@ -6,37 +6,37 @@ Tools for visualizing research publications.
 
 Run any tool with `-h` or `--help` to display help.
 
-Read papers from the Google Sheet, look up bibliographic details and abstracts from [Crossref](https://www.crossref.org/), [HAL](https://hal.science), [DataCite](https://datacite.org/), [Semantic Scholar](https://www.semanticscholar.org/), and [SCOPUS](https://www.elsevier.com/products/scopus), and write to `papers.csv`:
+Read papers from the configured Google Sheet, look up bibliographic details and abstracts from [Crossref](https://www.crossref.org/), [HAL](https://hal.science), [DataCite](https://datacite.org/), [Semantic Scholar](https://www.semanticscholar.org/), and [SCOPUS](https://www.elsevier.com/products/scopus), and write to CSV file (default: `papers.csv`):
 
 ```bash
 python sheets2csv.py
 ```
 
-Copy bibliographic details from the Google Sheet to `papers.csv` without looking up missing details:
+Copy bibliographic details from the configured Google Sheet to a CSV file (default: `papers.csv`) without looking up missing details:
 
 ```bash
 python sheets2csv.py --no-lookup
 ```
 
-Update the Google Sheet with bibliographic details from `papers.csv`:
+Update the configured Google Sheet with bibliographic details from a CSV file:
 
 ```bash
-python csv2sheets.py
+python csv2sheets.py papers.csv
 ```
 
-Generate wordclouds from the titles and abstracts in `papers.csv`, skipping any papers that do not have a HAL ID, and making a separate wordcloud for each research theme:
+Generate wordclouds from the titles and abstracts in a CSV file, skipping any papers that do not have a HAL ID, and making a separate wordcloud for each research theme:
 
 ```bash
-python csv2wordcloud.py --hal-only --by-theme
+python csv2wordcloud.py --hal-only --by-theme papers.csv
 ```
 
-Generate wordclouds from the titles and abstracts in the Google Sheet, giving 3x weight to papers where a team member is first or corresponding author, and setting the output size to 250 x 500 pixels:
+Generate wordclouds from the titles and abstracts in the configured Google Sheet, giving 3x weight to papers where a team member is first or corresponding author, and setting the output size to 250 x 500 pixels:
 
 ```bash
 python sheets2wordcloud.py --weight 3 --height 250 --width 500
 ```
 
-Read papers from the Google Sheet, look up BibTeX from [Crossref](https://www.crossref.org/) and [HAL](https://hal.science), and write to `references.bib`:
+Read papers from the configured Google Sheet, look up BibTeX from [Crossref](https://www.crossref.org/) and [HAL](https://hal.science), and write to a BibTeX file (default: `references.bib`):
 
 ```bash
 python sheets2bib.py
