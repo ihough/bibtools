@@ -7,6 +7,7 @@ TODO
 * Make *2wordcloud.py fail fast by checking if output files exist before loading papers
 * Use `html.unescape` to unescape response text e.g. "Environmental Science &amp; Technology" -> "Environmental Science & Technology"
 * Allow specifying path to sheets key in `configuration.yml`
+* Consider moving Google Sheets URL from `configuration.yml` to `keys/`
 
 
 ## New tools
