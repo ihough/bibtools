@@ -6,6 +6,8 @@ TODO
 * Implement requests backoff using `backoff` per https://www.crossref.org/documentation/retrieve-metadata/rest-api/tips-for-using-the-crossref-rest-api/#optimize-your-requests-and-pay-attention-to-errors
 * Make *2wordcloud.py fail fast by checking if output files exist before loading papers
 * Use `html.unescape` to unescape response text e.g. "Environmental Science &amp; Technology" -> "Environmental Science & Technology"
+* Allow specifying path to sheets key in `configuration.yml`
+
 
 ## New tools
 

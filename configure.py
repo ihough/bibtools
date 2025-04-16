@@ -17,10 +17,12 @@ class Configure:
 
         # Google Sheets url and authentication key
         self.sheet_url = config["sheet_url"]
-        try:
-            self.sheet_key = list(Path(self.KEYS_DIR).glob("*.json"))[0]
-        except IndexError:
-            raise FileNotFoundError(f"No json key found in {self.KEYS_DIR}/")
+        sheet_key_paths = list(Path(self.KEYS_DIR).glob("google-sheets-key*.json"))
+        if len(sheet_key_paths) > 1:
+            warn(f"Multiple Google Sheets keys found; using {sheet_key_paths[0]}")
+        if not any(sheet_key_paths):
+            sheet_key_paths = [None]
+        self.sheet_key = sheet_key_paths[0]
 
         # Contact email for 'polite' Crossref queries
         self._contact_email = config.get("contact_email")

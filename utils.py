@@ -700,10 +700,14 @@ def get_sheet(write: bool = False) -> gspread.Worksheet:
     scope = "https://www.googleapis.com/auth/spreadsheets.readonly"
     if write:
         scope = "https://www.googleapis.com/auth/spreadsheets"
+    if CONFIG.sheet_key is None:
+        raise ValueError("No Google Sheets key in keys/")
     creds = Credentials.from_service_account_file(CONFIG.sheet_key, scopes=[scope])
     client = gspread.authorize(creds)
 
     # Load the sheet
+    if CONFIG.sheet_url is None:
+        raise ValueError("No Google Sheets URL in configuration.yml")
     logger.info("Opening Google Sheet %s", CONFIG.sheet_url)
     sheet = client.open_by_url(CONFIG.sheet_url).sheet1
 

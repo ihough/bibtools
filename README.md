@@ -77,7 +77,7 @@ pip install .
 
 ### Update `configuration.yml`
 
-* Set the URL of the Google Sheet listing the publications
+* Set the URL of the Google Sheet listing the publications. Note: this step is only needed to use the scripts that interact with Google Sheets (all scripts with `sheets` in their name).
 
 * Optionally set a contact email to include in the User-Agent header of API requests. This allows API providers to contact you if the bibtools scripts cause issues with their service. Currently, the header is only used for queries to [Crossref](https://www.crossref.org/), who routes queries with contact information to a less-congested ["polite" API pool](https://github.com/CrossRef/rest-api-doc#good-manners--more-reliable-service). If you don't configure an email, bibtools will try to use your git email (from `git config user.email`).
 
@@ -108,7 +108,7 @@ For these tools to access the Google Sheet listing publications, you must set up
     * Click 'ADD KEY' > 'Create new key'
     * Choose 'JSON' key type and click 'CREATE'. This will download a JSON key file.
 
-5. Move the JSON key file that was downloaded to the `keys/` directory of this repository
+5. Move the JSON key file that was downloaded to the `keys/` directory of this repository and prefix the filename with `google-sheets-key`
 
 6. Share the Google Sheet listing the papers with the service account
 
