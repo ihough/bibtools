@@ -11,6 +11,7 @@ import argparse
 import gspread
 import pandas as pd
 import requests
+import requests_cache
 from google.oauth2.service_account import Credentials
 from wordcloud import STOPWORDS, WordCloud
 
@@ -35,6 +36,9 @@ PAPER_TO_SHEET = {
     "orcid": "First Author ORCID",
     "abstract": "Abstract",
 }
+
+# Enable caching
+requests_cache.install_cache("bibtools_cache", backend="sqlite")
 
 
 @dataclass(kw_only=True)

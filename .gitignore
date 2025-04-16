@@ -5,3 +5,6 @@ keys/
 *.png
 papers.csv
 references.bib
+
+# Requests cache
+bibtools_cache.sqlite

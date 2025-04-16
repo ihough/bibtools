@@ -1,11 +1,12 @@
 name: bibtools
 channels:
-- conda-forge
+  - conda-forge
 dependencies:
-- google-auth
-- gspread
-- pandas
-- python=3.12
-- pyyaml
-- requests
-- wordcloud
+  - google-auth
+  - gspread
+  - pandas
+  - python=3.12
+  - pyyaml
+  - requests
+  - requests-cache
+  - wordcloud
