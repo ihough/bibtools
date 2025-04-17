@@ -14,6 +14,8 @@ TODO
 
 * Tool to read CSV and write to BibTeX file
 
+* Tool to read papers from CSV, get details from Crossref etc., and write to CSV
+
 * Tool to read BibTeX file and write to CSV
 
 
