@@ -1,5 +1,21 @@
 # Changelog
 
+This file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [0.0.2]
+
+### Added
+
+- `txt2csv.py`: matches references in a text file to Crossref records
+- Cache API requests
+- Use URL-encoded DOIs in API requests
+
+### Changed
+
+- Specify path to input and output files on command line
+- Reorganize README
+- Modify Google Sheet header columns
+
 ## [0.0.1]
 
 ### Added
