@@ -1,45 +1,18 @@
 # bibtools
 
-Tools for visualizing research publications.
+Tools for managing and visualizing a bibliography
+
 
 ## Usage
 
 Run any tool with `-h` or `--help` to display help.
 
-Read papers from the configured Google Sheet, look up bibliographic details and abstracts from [Crossref](https://www.crossref.org/), [HAL](https://hal.science), [DataCite](https://datacite.org/), [Semantic Scholar](https://www.semanticscholar.org/), and [SCOPUS](https://www.elsevier.com/products/scopus), and write to CSV file (default: `papers.csv`):
+### Base tools
+
+Generate wordclouds from the titles and abstracts in a CSV file:
 
 ```bash
-python sheets2csv.py
-```
-
-Copy bibliographic details from the configured Google Sheet to a CSV file (default: `papers.csv`) without looking up missing details:
-
-```bash
-python sheets2csv.py --no-lookup
-```
-
-Update the configured Google Sheet with bibliographic details from a CSV file:
-
-```bash
-python csv2sheets.py papers.csv
-```
-
-Generate wordclouds from the titles and abstracts in a CSV file, skipping any papers that do not have a HAL ID, and making a separate wordcloud for each research theme:
-
-```bash
-python csv2wordcloud.py --hal-only --by-theme papers.csv
-```
-
-Generate wordclouds from the titles and abstracts in the configured Google Sheet, giving 3x weight to papers where a team member is first or corresponding author, and setting the output size to 250 x 500 pixels:
-
-```bash
-python sheets2wordcloud.py --weight 3 --height 250 --width 500
-```
-
-Read papers from the configured Google Sheet, look up BibTeX from [Crossref](https://www.crossref.org/) and [HAL](https://hal.science), and write to a BibTeX file (default: `references.bib`):
-
-```bash
-python sheets2bib.py
+python csv2wordcloud.py papers.csv
 ```
 
 Read references (citations) from a text file, look up DOI and details from [Crossref](https://www.crossref.org/) and write to a CSV file (default: `references.csv`):
@@ -54,6 +27,63 @@ python txt2csv.py references.txt
 Matching references to Crossref items is an inherently perfect process. We **highly recommend** inspecting the output CSV file to ensure **all** matches are correct. You can do this by comparing the `author`, `title`, `year`, and `journal` columns to the  `query_text` column, which contains the original references from the input text file.
 
 For more on matching, see [Crossref's metadata matching blog series](https://www.crossref.org/categories/metadata-matching/).
+
+### Google Sheets tools
+
+> [!NOTE]
+> Scripts with `sheets` in their name interact with Google Sheets. You must complete the [setup steps](#setup) below to configure API access to a Google Sheet before using these tools.
+
+Update the configured Google Sheet with bibliographic details from a CSV file:
+
+```bash
+python csv2sheets.py papers.csv
+```
+
+Read papers from the configured Google Sheet, look up BibTeX from [Crossref](https://www.crossref.org/) and [HAL](https://hal.science), and write to a BibTeX file (default: `references.bib`):
+
+```bash
+python sheets2bib.py
+```
+
+Read papers from the configured Google Sheet, look up bibliographic details and abstracts from [Crossref](https://www.crossref.org/), [HAL](https://hal.science), [DataCite](https://datacite.org/), [Semantic Scholar](https://www.semanticscholar.org/), and [SCOPUS](https://www.elsevier.com/products/scopus), and write to a CSV file (default: `papers.csv`):
+
+```bash
+python sheets2csv.py
+```
+
+Copy bibliographic details from the configured Google Sheet to a CSV file (default: `papers.csv`) without looking up missing details:
+
+```bash
+python sheets2csv.py --no-lookup
+```
+
+Generate wordclouds from the titles and abstracts in the configured Google Sheet:
+
+```bash
+python sheets2wordcloud.py
+```
+
+### Further wordcloud examples
+
+All wordcloud options are available for both CSV (`csv2wordcloud.py`) and Google Sheets (`sheets2wordcloud.py`) input.
+
+Generate wordclouds from a CSV file, considering only unigrams (not common collocations):
+
+```bash
+python csv2wordcloud.py --unigrams papers.csv
+```
+
+Generate wordclouds from a CSV file, skipping any papers that do not have a HAL ID and making a separate wordcloud for each research theme (indicated by a CSV column):
+
+```bash
+python csv2wordcloud.py --hal-only --by-theme papers.csv
+```
+
+Generate wordclouds from the titles and abstracts in a CSV file, giving 3x weight to papers where a team member is first, corresponding, or last author (indicated by a CSV column), and setting the output size to 250 x 500 pixels:
+
+```bash
+python csv2wordcloud.py --weight 3 --height 250 --width 500 papers.csv
+```
 
 
 ## Setup
@@ -77,7 +107,7 @@ pip install .
 
 ### Update `configuration.yml`
 
-* Set the URL of the Google Sheet listing the publications. Note: this step is only needed to use the scripts that interact with Google Sheets (all scripts with `sheets` in their name).
+* Set the URL of the Google Sheet listing the publications. This step is only needed to use the scripts that interact with Google Sheets (all scripts with `sheets` in their name).
 
 * Optionally set a contact email to include in the User-Agent header of API requests. This allows API providers to contact you if the bibtools scripts cause issues with their service. Currently, the header is only used for queries to [Crossref](https://www.crossref.org/), who routes queries with contact information to a less-congested ["polite" API pool](https://github.com/CrossRef/rest-api-doc#good-manners--more-reliable-service). If you don't configure an email, bibtools will try to use your git email (from `git config user.email`).
 
@@ -108,7 +138,7 @@ For these tools to access the Google Sheet listing publications, you must set up
     * Click 'ADD KEY' > 'Create new key'
     * Choose 'JSON' key type and click 'CREATE'. This will download a JSON key file.
 
-5. Move the JSON key file that was downloaded to the `keys/` directory of this repository and prefix the filename with `google-sheets-key`
+5. Move the JSON key file that was downloaded to the `keys/` directory of this repository and rename it so the filename starts with `google-sheets-key` e.g. `google-sheets-key_original-filename.json`
 
 6. Share the Google Sheet listing the papers with the service account
 
