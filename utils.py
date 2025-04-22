@@ -95,6 +95,7 @@ class Reference(Requester):
     text: str
     doi: str | None = None
     citekey: str | None = None
+    author: str | None = None
     year: str | None = None
     title: str | None = None
     journal: str | None = None
@@ -103,7 +104,7 @@ class Reference(Requester):
     def __repr__(self) -> str:
         if self.score is not None:
             return (
-                "Reference("
+                "Reference(\n"
                 + f"  citekey: '{self.citekey}'\n"
                 + f"  score: {round(self.score, 1)}\n"
                 + f"  doi: '{self.doi}'\n"
@@ -119,12 +120,12 @@ class Reference(Requester):
         return requests.utils.quote(self.text)
 
     def format_author(self, item: dict) -> str:
-        """Return family name + initials for first author of a crossref item"""
+        """Return last name, given names for first author of a crossref item"""
 
         author = item.get("author", [{}])[0]
         family = author.get("family")
-        given = author.get("given", "")
-        if not any(author) or not any([family, given]):
+        given = author.get("given")
+        if not any([family, given]):
             msg = "\n  ".join(
                 [
                     "Match has no author:",
@@ -133,14 +134,9 @@ class Reference(Requester):
                 ]
             )
             warn(msg)
-            return ""
+            return None
 
-        initials = []
-        for part in given.split():
-            initials.append("-".join([x[0].upper() + "." for x in part.split("-")]))
-        initials = " ".join(initials)
-
-        return " ".join([x for x in [family, initials] if x is not None])
+        return ", ".join([x for x in [family, given] if x is not None])
 
     def format_citekey(self, item: dict) -> str:
         """Return a citation key for a crossref item"""
@@ -188,10 +184,10 @@ class Reference(Requester):
         scores = [x["score"] / len(self.text.split()) for x in items]
 
         # Skip if top two matches are tied
-        if len(items) > 1 and scores[0] == scores[1]:
+        if scores[0] == scores[1]:
             msg = "\n  ".join(
                 [
-                    f"Top matches have same score ({scores[0]}); skipping:",
+                    f"Top matches have same score ({round(scores[0], 3)}); skipping:",
                     f"Query: {self.text}",
                     f"Best:  {self.format_crossref_item(items[0])} {items[0]['DOI']}",
                     f"Next:  {self.format_crossref_item(items[1])} {items[1]['DOI']}",
@@ -204,7 +200,7 @@ class Reference(Requester):
         if items[0]["type"] == "component":
             msg = "\n  ".join(
                 [
-                    "Best match is a component; using next-best match",
+                    "Best match is a component; using next-best match:",
                     f"Query: {self.text}",
                     f"Best:  {self.format_crossref_item(items[0])} {items[0]['DOI']}",
                     f"Next:  {self.format_crossref_item(items[1])} {items[1]['DOI']}",
@@ -218,7 +214,7 @@ class Reference(Requester):
         if scores[0] < 3:
             msg = "\n  ".join(
                 [
-                    f"Match has low normalized score ({scores[0]})",
+                    f"Best match has low normalized score ({round(scores[0], 3)})",
                     f"Query: {self.text}",
                     f"Match: {self.format_crossref_item(items[0])} {items[0]['DOI']}",
                 ]
@@ -780,10 +776,19 @@ def get_sheet_papers() -> list[Paper]:
     return papers
 
 
-def get_txt_references(path: Path | str) -> list[Reference]:
-    """Read references from a text file"""
+def get_txt_references(path: str) -> list[Reference]:
+    """Read references from a text file and deduplicate"""
 
-    return [Reference(ref) for ref in read_txt(path)]
+    logger.info("Reading references from %s", path)
+    items = Path(path).read_text().splitlines()
+
+    if not any(items):
+        raise ValueError(f"No references found in {path}")
+
+    # Deduplicate
+    items = list(dict.fromkeys(items))
+
+    return [Reference(ref) for ref in items]
 
 
 def papers_to_wordclouds(
@@ -917,20 +922,10 @@ def read_csv(path: str = None, validate: bool = True) -> pd.DataFrame:
     return papers_df
 
 
-def read_txt(path: Path | str) -> list[str]:
-    """Read references from a text file
 
-    The file must have a single reference on each line
-    """
 
-    path = Path(path).resolve()
-    logger.info("Reading %s", path)
-    papers = path.read_text().splitlines()
 
-    # Deduplicate
-    papers = list(dict.fromkeys(papers))
 
-    return papers
 
 
 def validate_csv(csv: pd.DataFrame) -> None:

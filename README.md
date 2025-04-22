@@ -24,7 +24,7 @@ python txt2csv.py references.txt
 > [!WARNING]
 > The `txt2csv.py` script will likely output warnings about matches that may be less accurate. You **must** verify the correcteness of these matches in the output CSV.
 
-Matching references to Crossref items is an inherently perfect process. We **highly recommend** inspecting the output CSV file to ensure **all** matches are correct. You can do this by comparing the `author`, `title`, `year`, and `journal` columns to the  `query_text` column, which contains the original references from the input text file.
+Matching references to Crossref items is an inherently perfect process. We **highly recommend** inspecting the output CSV file to ensure **all** matches are correct. You can do this by comparing the `author`, `title`, `year`, and `journal` columns to the `query` column, which contains the original references from the input text file. The `score` column contains the match score.
 
 For more on matching, see [Crossref's metadata matching blog series](https://www.crossref.org/categories/metadata-matching/).
 
