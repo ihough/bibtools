@@ -9,6 +9,14 @@ Run any tool with `-h` or `--help` to display help.
 
 ### Base tools
 
+#### `csv2bib.py`
+
+Read paper DOIs / HAL IDs from a CSV, look up BibTeX from [Crossref](https://www.crossref.org/) and [HAL](https://hal.science), and write to a BibTeX file (default: `references.bib`):
+
+```bash
+python csv2bib.py papers.csv
+```
+
 #### `csv2wordcloud.py`
 
 Generate wordclouds from the titles and abstracts in a CSV file:
