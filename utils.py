@@ -937,6 +937,7 @@ def read_csv(path: str = None) -> pd.DataFrame:
 
     logger.info("Reading %s", path)
     items = pd.read_csv(path).replace({float("nan"): None})
+    items.columns = items.columns.str.lower()
 
     if items.shape[0] == 0:
         raise ValueError(f"No references found in {path}")
