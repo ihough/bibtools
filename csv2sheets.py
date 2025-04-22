@@ -5,8 +5,7 @@
 import argparse
 import logging
 
-from utils import read_csv, get_sheet, PAPER_TO_SHEET
-
+from utils import PAPER_TO_SHEET, get_sheet, read_csv, validate_csv_matches_sheet
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +15,7 @@ def csv2sheets(csv_path: str):
 
     # Read papers from the CSV
     papers_df = read_csv(csv_path)
+    validate_csv_matches_sheet(papers_df)
 
     if len(papers_df) == 0:
         logger.info("No papers found in %s", csv_path)

@@ -261,21 +261,23 @@ class Paper(Requester):
     hal_id: str | None = None
     author: str | None = None
     year: int | None = None
-    is_main: bool | str = False
-    theme: int | None = None
-    lister: str | None = field(default=None, repr=False)
-    note: str | None = field(default=None, repr=False)
     title: str | None = field(default=None, repr=False)
     journal: str | None = field(default=None, repr=False)
-    orcid: str | None = field(default=None, repr=False)
     abstract: str | None = field(default=None, repr=False)
+    orcid: str | None = field(default=None, repr=False)
+
+    # Additional attributes for Google Sheets columns
+    is_main: bool | str | None = field(default=None, repr=False)
+    theme: int | None = field(default=None, repr=False)
+    lister: str | None = field(default=None, repr=False)
+    note: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         self.doi = parse_doi(self.doi, raise_on_fail=True)
         self.hal_id = self.parse_hal_id(self.hal_id)
         if not self.has_doi() and not self.has_hal_id():
-            raise ValueError("Paper must have DOI or HAL ID; got neither.")
-
+            args = {k: v for k, v in vars(self).items() if v is not None}
+            raise ValueError(f"Paper must have DOI or HAL ID. Got: {args}")
         self.is_main = str(self.is_main).strip().lower() in ["true", "yes", "y", "oui"]
 
     def doi_link(self) -> str | None:
@@ -324,7 +326,7 @@ class Paper(Requester):
         return re.sub(r"\s+", " ", abstract).strip()
 
     def get_abstract_semanticscholar(self) -> str | None:
-        """Query Semantic Scholar for paper abstract
+        """Query semanticscholar.org for paper abstract
 
         Only used if abstract not found on crossref or hal.science
         """
@@ -351,10 +353,10 @@ class Paper(Requester):
         """Return BibTeX entry for paper"""
 
         # If DOI is missing, try to get it from hal.science
-        if self.doi is None:
-            self.doi = self.get_details_hal()["doi"]
+        if not self.has_doi():
+            self.doi = self.get_details_hal().get("doi", "no doi")
 
-        # Prefer DOI-based BibTeX from crossref
+        # Prefer DOI-based BibTeX from Crossref
         if self.has_doi():
             return self.get_bibtex_crossref()
 
@@ -368,9 +370,11 @@ class Paper(Requester):
         headers = {"Accept": "application/x-bibtex"}
         response = self.get(url, headers=headers)
 
-        # If not found, return an error comment in BibTeX format
+        # If not found, warn and return an error comment in BibTeX format
         if response.status_code == 404:
-            return f"% Error: No BibTeX found for doi:{self.doi}"
+            msg = f"No Crossref BibTeX for paper doi:{self.doi}"
+            warn(msg)
+            return f"% Error: {msg}"
 
         if response.status_code != 200:
             raise ValueError(f"Error: status {response.status_code} from {url}")
@@ -390,9 +394,11 @@ class Paper(Requester):
 
         data = response.text.strip()
 
-        # If not found, return an error comment in BibTeX format
+        # If not found, warn and return an error comment in BibTeX format
         if data == "":
-            return f"% Error: No BibTeX found for hal:{self.hal_id}"
+            msg = f"No HAL BibTeX for paper hal:{self.hal_id}"
+            warn(msg)
+            return f"% Error: {msg}"
 
         # Confirm that only 1 entry was returned
         n_entries = data.count(r"HAL_ID =")
@@ -541,46 +547,63 @@ class Paper(Requester):
 
         return self.hal_id is not None and self.hal_id.lower() != "no hal id"
 
-    def lookup_details(self) -> None:
-        """Get and set bibliographic details"""
+    def lookup_details(self, get_hal_id: bool = True, get_abstract: bool = True) -> None:
+        """Get and set bibliographic details
 
-        # Look up details from hal.science (searches by DOI or HAL ID)
-        info = self.get_details_hal()
+        Args:
+            get_hal_id: Whether to look up the paper's HAL ID (default: True)
+            get_abstract: Whether to look up the paper's abstract (default: True)
+        """
 
-        # Set HAL ID if HAL record was found. HAL records may have multiple IDs, so this
-        # ensures that the 'main' ID is used. It also sets the HAL ID if it was missing
-        # and the record was found by DOI.
-        self.hal_id = info.get("hal_id", "no hal id")
+        # Possibly look up details from hal.science (searches by DOI or HAL ID)
+        # Do this first b/c can only get HAL ID from hal.science
+        info = {}
+        if get_hal_id or not self.has_doi():
+            info = self.get_details_hal()
 
-        # Set DOI if it was missing or paper was marked as having no DOI
-        if not self.has_doi() and "doi" in info:
-            self.doi = info["doi"]
+            # Set HAL ID if HAL record was found. HAL records may have multiple IDs, so
+            # this ensures that the 'main' ID is used. It also sets the HAL ID if it was
+            # missing and the record was found by DOI.
+            self.hal_id = info.get("hal_id", "no hal id")
 
-        # If paper has a DOI, look up details from crossref
+            # Set DOI if it is missing and was found on HAL
+            # Warn and don't overwrite existing DOI if HAL-provided DOI differs
+            if "doi" in info:
+                if self.has_doi() and self.doi != info["doi"]:
+                    warn(
+                        f"Paper {self} has DOI {self.doi} but HAL returned DOI"
+                        f" {info['doi']}. Please check DOI and HAL ID."
+                    )
+                else:
+                    self.doi = info["doi"]
+
+        # If paper has a DOI, look up details from Crossref (and other sources)
+        # Do this even if paper is on HAL b/c Crossref metadata is often more complete
         if self.has_doi():
             info |= self.get_details_crossref()  # prefer info from crossref
 
-            # If no info, query datacite (in case the 'paper' is a dataset or software)
+            # If no info, query DataCite (in case the 'paper' is a dataset or software)
             if not any(info):
                 info = self.get_details_datacite()
 
-            # If abstract is missing, try to get it from semantic scholar
-            if info.get("abstract") is None:
+            # Possibly look up abstract
+            # Prefer Semantic Scholar, fall back on Scopus (if API key configured)
+            if get_abstract and info.get("abstract") is None:
                 info["abstract"] = self.get_abstract_semanticscholar()
+                if info["abstract"] is None:
+                    info["abstract"] = self.get_abstract_scopus()
 
-            # If abstract still missing, try to get it from Scopus
-            if info.get("abstract") is None:
-                info["abstract"] = self.get_abstract_scopus()
-
-        # Raise if could not find bibliographic details
+        # Warn if could not find bibliographic details
         if not any(info):
-            raise ValueError(f"No HAL, Crossref, or DataCite record for {self}")
+            msg = f"No HAL, Crossref, or DataCite record for {self}. Check the DOI"
+            msg += " and HAL ID." if self.has_hal_id() else "."
+            warn(msg)
 
         # Set bibliographic attributes
         self.author = info.get("author")
         self.orcid = info.get("orcid")
-        self.title = info["title"]
-        self.year = info["year"]
+        self.title = info.get("title")
+        self.year = info.get("year")
         self.journal = info.get("journal")
         self.abstract = info.get("abstract")
 
@@ -713,11 +736,19 @@ def get_sheet(write: bool = False) -> gspread.Worksheet:
     return sheet
 
 
-def get_csv_papers(path: str, validate: bool = True) -> list[Paper]:
+def get_csv_papers(path: str) -> list[Paper]:
     """Read papers from a CSV"""
 
-    papers_df = read_csv(path=path, validate=validate)
-    papers = [Paper(**row) for _, row in papers_df.iterrows()]
+    items = read_csv(path)
+    validate_csv_has_id_column(items)
+    papers = []
+    for i, row in items.iterrows():
+        # Ignore unrecognized columns
+        try:
+            papers.append(Paper(**{k: v for k, v in row.items() if k in PAPER_TO_SHEET}))
+        except ValueError as err:
+            err.add_note(f"Error caused by row {i + 1} of {path}")
+            raise
 
     return papers
 
@@ -901,40 +932,33 @@ def parse_doi(doi: str, raise_on_fail: bool = False) -> str | None:
         raise ValueError(f"Unrecognized DOI: {doi}")
 
 
-def read_csv(path: str = None, validate: bool = True) -> pd.DataFrame:
-    """Read paper bibliographic details from a CSV
+def read_csv(path: str = None) -> pd.DataFrame:
+    """Read paper bibliographic details from a CSV"""
 
-    Args:
-        validate: Whether to check the CSV layout (default: True)
-    """
-
-    # Read CSV
     logger.info("Reading %s", path)
-    papers_df = pd.read_csv(path).replace({float("nan"): None})
+    items = pd.read_csv(path).replace({float("nan"): None})
 
-    # Possibly confirm the CSV has the expected layout
-    if validate:
-        validate_csv(papers_df)
+    if items.shape[0] == 0:
+        raise ValueError(f"No references found in {path}")
 
-    if papers_df.shape[0] == 0:
-        raise ValueError(f"No papers found in {path}")
-
-    return papers_df
+    return items
 
 
+def validate_csv_has_id_column(csv: pd.DataFrame) -> None:
+    """Confirm the CSV file has a 'doi' or 'hal_id' column"""
+
+    columns = [x.lower().strip() for x in csv.columns]
+    if not "doi" in columns and not "hal_id" in columns:
+        raise ValueError("CSV must have 'doi' or 'hal_id' column.")
 
 
-
-
-
-
-def validate_csv(csv: pd.DataFrame) -> None:
-    """Confirm CSV file has the expected layout"""
+def validate_csv_matches_sheet(csv: pd.DataFrame) -> None:
+    """Confirm CSV file columns match the Google Sheet's columns"""
 
     for i, expected in enumerate(PAPER_TO_SHEET):
         if csv.columns[i].lower().strip() != expected.lower().strip():
             raise ValueError(
-                "Unrecognized csv layout."
+                "CSV layout does not match Google Sheet."
                 + f" Column {i} header should be '{expected}'; got '{csv.columns[i]}'."
             )
 

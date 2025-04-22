@@ -9,13 +9,17 @@ Run any tool with `-h` or `--help` to display help.
 
 ### Base tools
 
+#### `csv2wordcloud.py`
+
 Generate wordclouds from the titles and abstracts in a CSV file:
 
 ```bash
 python csv2wordcloud.py papers.csv
 ```
 
-Read references (citations) from a text file, look up DOI and details from [Crossref](https://www.crossref.org/) and write to a CSV file (default: `references.csv`):
+#### `txt2csv.py`
+
+Read references from a text file (e.g. a bibliography), look up DOI and details from [Crossref](https://www.crossref.org/) and write to a CSV file (default: `references.csv`):
 
 ```bash
 python txt2csv.py references.txt
@@ -33,19 +37,25 @@ For more on matching, see [Crossref's metadata matching blog series](https://www
 > [!NOTE]
 > Scripts with `sheets` in their name interact with Google Sheets. You must complete the [setup steps](#setup) below to configure API access to a Google Sheet before using these tools.
 
+#### `csv2sheets.py`
+
 Update the configured Google Sheet with bibliographic details from a CSV file:
 
 ```bash
 python csv2sheets.py papers.csv
 ```
 
-Read papers from the configured Google Sheet, look up BibTeX from [Crossref](https://www.crossref.org/) and [HAL](https://hal.science), and write to a BibTeX file (default: `references.bib`):
+#### `sheets2bib.py`
+
+Read paper DOIs / HAL IDs from the configured Google Sheet, look up BibTeX from [Crossref](https://www.crossref.org/) and [HAL](https://hal.science), and write to a BibTeX file (default: `references.bib`):
 
 ```bash
 python sheets2bib.py
 ```
 
-Read papers from the configured Google Sheet, look up bibliographic details and abstracts from [Crossref](https://www.crossref.org/), [HAL](https://hal.science), [DataCite](https://datacite.org/), [Semantic Scholar](https://www.semanticscholar.org/), and [SCOPUS](https://www.elsevier.com/products/scopus), and write to a CSV file (default: `papers.csv`):
+#### `sheets2csv.py`
+
+Read paper DOIs / HAL IDs from the configured Google sheet, look up bibliographic details (e.g. author, year, abstract) from [Crossref](https://www.crossref.org/), [HAL](https://hal.science), [DataCite](https://datacite.org/), [Semantic Scholar](https://www.semanticscholar.org/), and [SCOPUS](https://www.elsevier.com/products/scopus), and write to a CSV file (default: `papers.csv`):
 
 ```bash
 python sheets2csv.py
@@ -57,17 +67,19 @@ Copy bibliographic details from the configured Google Sheet to a CSV file (defau
 python sheets2csv.py --no-lookup
 ```
 
+#### `sheets2wordcloud.py`
+
 Generate wordclouds from the titles and abstracts in the configured Google Sheet:
 
 ```bash
 python sheets2wordcloud.py
 ```
 
-### Further wordcloud examples
+### Wordcloud examples
 
 All wordcloud options are available for both CSV (`csv2wordcloud.py`) and Google Sheets (`sheets2wordcloud.py`) input.
 
-Generate wordclouds from a CSV file, considering only unigrams (not common collocations):
+Generate wordclouds from a CSV file, considering only unigrams (not [collocations](https://en.wikipedia.org/wiki/Collocation)):
 
 ```bash
 python csv2wordcloud.py --unigrams papers.csv
