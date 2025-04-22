@@ -2,6 +2,13 @@
 
 This file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.0.3]
+
+### Added
+
+- `csv2bib.py`: read paper DOI / HAL IDs from CSV file and lookup BibTeX
+- `csv2csv.py`: read paper DOI / HAL IDs from CSV file and lookup details (author, abstract, etc.)
+
 ## [0.0.2]
 
 ### Added
