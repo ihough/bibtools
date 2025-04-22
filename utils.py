@@ -439,7 +439,7 @@ class Paper(Requester):
         }
         if any(data.get("author", [])):
             author = data["author"][0]
-            details["author"] = author["given"] + " " + author["family"].upper()
+            details["author"] = ", ".join([author["family"], author["given"]])
             if author.get("ORCID") is not None:
                 details["orcid"] = author.get("ORCID")
         if any(data.get("container-title", [])):
@@ -467,7 +467,7 @@ class Paper(Requester):
         author = data["creators"][0]
         details = {
             "doi": data["doi"],
-            "author": author["givenName"] + " " + author["familyName"].upper(),
+            "author": ", ".join([author["familyName"], author["givenName"]]),
             "title": re.sub(r"\s+", " ", data["titles"][0]["title"]).strip(),
             "year": data["publicationYear"],
         }
@@ -514,7 +514,7 @@ class Paper(Requester):
             raise ValueError(f"Found {data["numFound"]} HAL records matching {query}")
 
         data = data["docs"][0]
-        author = data["authFirstName_s"][0] + " " + data["authLastName_s"][0].upper()
+        author = ", ".join([data["authLastName_s"][0], data["authFirstName_s"][0]])
         details = {
             "doi": data.get("doiId_s", "no doi"),
             "hal_id": data["halId_s"],
