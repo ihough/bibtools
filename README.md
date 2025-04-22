@@ -17,6 +17,14 @@ Read paper DOIs / HAL IDs from a CSV, look up BibTeX from [Crossref](https://www
 python csv2bib.py papers.csv
 ```
 
+#### `csv2csv.py`
+
+Read paper DOIs / HAL IDs from a CSV, look up bibliographic details (e.g. author, year, abstract) from [Crossref](https://www.crossref.org/), [HAL](https://hal.science), [DataCite](https://datacite.org/), [Semantic Scholar](https://www.semanticscholar.org/), and [SCOPUS](https://www.elsevier.com/products/scopus), and write to a CSV file (default: `papers.csv`):
+
+```bash
+python csv2csv.py papers.csv
+```
+
 #### `csv2wordcloud.py`
 
 Generate wordclouds from the titles and abstracts in a CSV file:
