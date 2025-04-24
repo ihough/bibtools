@@ -293,6 +293,18 @@ class Paper(Requester):
             raise ValueError(f"Paper must have DOI or HAL ID. Got: {args}")
         self.is_main = str(self.is_main).strip().lower() in ["true", "yes", "y", "oui"]
 
+    def clean_abstract(self, abstract: str) -> str:
+        """Strip extra whitespace and JATS tags from abstract text"""
+
+        abstract = re.sub(r"</?jats:[\w\-]+>", " ", abstract)
+        abstract = re.sub(r"</?(div|p)>", " ", abstract)
+        abstract = re.sub(r"^ *[Aa]bstract\.?", " ", abstract)
+        abstract = re.sub(r"^ *ABSTRACT\.?", " ", abstract)
+        abstract = re.sub(r"\s+", " ", abstract)
+        abstract = abstract.strip()
+
+        return abstract
+
     def doi_link(self) -> str | None:
         """Return the DOI link e.g. https://doi.org/10.1000/182"""
 
@@ -335,8 +347,10 @@ class Paper(Requester):
 
         data = response.json()["full-text-retrieval-response"]["coredata"]
         abstract = data["dc:description"]
+        if abstract is not None:
+            abstract = self.clean_abstract(abstract)
 
-        return re.sub(r"\s+", " ", abstract).strip()
+        return abstract
 
     def get_abstract_semanticscholar(self) -> str | None:
         """Query semanticscholar.org for paper abstract
@@ -358,9 +372,9 @@ class Paper(Requester):
 
         abstract = response.json()["abstract"]
         if abstract is not None:
-            return re.sub(r"\s+", " ", abstract).strip()
+            abstract = self.clean_abstract(abstract)
 
-        return None
+        return abstract
 
     def get_bibtex(self) -> str:
         """Return BibTeX entry for paper"""
@@ -464,7 +478,7 @@ class Paper(Requester):
         details["page"] = data.get("page")
         abstract = data.get("abstract")
         if abstract is not None:
-            details["abstract"] = re.sub(r"\s+", " ", abstract).strip()
+            details["abstract"] = self.clean_abstract(abstract)
 
         return details
 
@@ -496,7 +510,7 @@ class Paper(Requester):
                     abstract = desc["description"]
                     break
         if abstract is not None:
-            details["abstract"] = re.sub(r"\s+", " ", abstract).strip()
+            details["abstract"] = self.clean_abstract(abstract)
 
         return details
 
@@ -546,7 +560,7 @@ class Paper(Requester):
         details["page"] = data.get("page_s")
         abstract = data.get("abstract_s", [None])[0]
         if abstract is not None:
-            details["abstract"] = re.sub(r"\s+", " ", abstract)
+            details["abstract"] = self.clean_abstract(abstract)
 
         return details
 
@@ -609,9 +623,10 @@ class Paper(Requester):
             # Possibly look up abstract
             # Prefer Semantic Scholar, fall back on Scopus (if API key configured)
             if get_abstract and info.get("abstract") is None:
-                info["abstract"] = self.get_abstract_semanticscholar()
-                if info["abstract"] is None:
-                    info["abstract"] = self.get_abstract_scopus()
+                abstract = self.get_abstract_semanticscholar()
+                if abstract is None:
+                    abstract = self.get_abstract_scopus()
+                info["abstract"] = abstract
 
         # Warn if could not find bibliographic details
         if not any(info):
