@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Read papers from a Google Sheet, look up DOI and details, and write to a CSV"""
+"""Read papers from a Google Sheet, possibly look up details, and write to a CSV"""
 
 import argparse
 import csv
@@ -20,7 +20,7 @@ def sheets2csv(
     get_abstract: bool = True,
     get_hal_id=True,
 ) -> None:
-    """Read papers from a Google Sheet, look up DOI and details, and write to a CSV
+    """Read papers from a Google Sheet, possibly look up details, and write to a CSV
 
     Details are from Crossref and HAL. Abstracts are from Semantic Scholar and Scopus.
 
@@ -87,8 +87,8 @@ def sheets2csv(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Read papers from a Google Sheet, look up DOI and details, and write"
-        + " to a CSV file",
+        description="Read papers from a Google Sheet, possibly look up DOI and details,"
+        + " and write to a CSV file",
         epilog="Bibliographic details from Crossref and HAL. Abstracts from Semantic"
         + " Scholar and SCOPUS.",
     )
@@ -102,7 +102,7 @@ if __name__ == "__main__":
         dest="get_abstract",
     )
     parser.add_argument(
-        "--no-hal", action="store_false", help="do not look up HAL ID", dest="get_hal_id"
+        "--no-hal", action="store_false", help="do not look up HAL IDs", dest="get_hal_id"
     )
     parser.add_argument(
         "--no-lookup",

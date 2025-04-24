@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Update Google Sheet with paper bibliographic details from a CSV file"""
+"""Update a Google Sheet with paper bibliographic details from a CSV file"""
 
 import argparse
 import logging
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def csv2sheets(csv_path: str):
-    """Update Google Sheet with paper bibliographic details from a CSV file"""
+    """Update a Google Sheet with paper bibliographic details from a CSV file"""
 
     # Read papers from the CSV
     papers_df = read_csv(csv_path)
@@ -50,7 +50,7 @@ def csv2sheets(csv_path: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Update the Google Sheet with bibliographic details from a CSV file"
+        description="Update a Google Sheet with bibliographic details from a CSV file"
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="display DEBUG level messages"

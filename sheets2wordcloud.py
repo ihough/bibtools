@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Read paper titles and abstracts from Google Sheet and generate wordclouds"""
+"""Read paper titles and abstracts from a Google Sheet and generate wordclouds"""
 
 import argparse
 import logging
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def sheets2wordcloud(args: argparse.Namespace) -> None:
-    """Read paper titles and abstracts from Google Sheet and generate wordclouds"""
+    """Read paper titles and abstracts from a Google Sheet and generate wordclouds"""
 
     # Read papers from Google Sheet
     papers = get_sheet_papers()
@@ -32,7 +32,7 @@ def sheets2wordcloud(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = wordcloud_argparser(
-        description="Generate wordclouds from the titles and abstracts in the Google Sheet"
+        description="Generate wordclouds from the titles and abstracts in a Google Sheet"
     )
     args = parser.parse_args()
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Read papers from a Google Sheet, lookup details, and write to a BibTeX file"""
+"""Read papers from a Google Sheet, look up details, and write to a BibTeX file"""
 
 import argparse
 import logging
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def sheets2bib(bib_path: Path, force: bool = False) -> None:
-    """Read papers from a Google Sheet, lookup details, and write to a BibTeX file
+    """Read papers from a Google Sheet, look up details, and write to a BibTeX file
 
     BibTeX lookup uses crossref.org and hal.science
 

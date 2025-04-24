@@ -31,9 +31,11 @@ def csv2wordcloud(csv_path: str, args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = wordcloud_argparser(
-        description="Generate wordclouds from a CSV listing paper titles and abstracts"
+        description="Generate wordclouds from the titles and abstracts in a CSV file"
     )
-    parser.add_argument("csv_path", help="Path to CSV file listing papers")
+    parser.add_argument(
+        "csv_path", help="Path to CSV file listing paper titles and abstracts"
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
