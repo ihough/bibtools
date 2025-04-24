@@ -39,7 +39,18 @@ def txt2csv(txt_path: Path, csv_path: Path, force: bool = False) -> None:
     logger.info("Looking up bibliographic details for %s references", len(references))
     with csv_path.open(mode="w", newline="", encoding="utf-8") as file:
         # Write header row
-        csv_headers = ["doi", "author", "year", "title", "journal", "query", "score"]
+        csv_headers = [
+            "doi",
+            "author",
+            "year",
+            "title",
+            "journal",
+            "volume",
+            "issue",
+            "page",
+            "query",
+            "score",
+        ]
         writer = csv.writer(file, dialect="unix")
         writer.writerow(csv_headers)
 

@@ -44,7 +44,16 @@ def csv2csv(
     logger.info("Looking up bibliographic details for %s papers", len(papers))
     with out_path.open(mode="w", newline="", encoding="utf-8") as file:
         # Write header row
-        csv_headers = ["doi", "author", "year", "title", "journal"]
+        csv_headers = [
+            "doi",
+            "author",
+            "year",
+            "title",
+            "journal",
+            "volume",
+            "issue",
+            "page",
+        ]
         if get_abstract:
             csv_headers.append("abstract")
         if get_hal_id:
@@ -100,7 +109,7 @@ if __name__ == "__main__":
         dest="get_abstract",
     )
     parser.add_argument(
-        "--no-hal", action="store_false", help="do not look up HAL ID", dest="get_hal_id"
+        "--no-hal", action="store_false", help="do not look up HAL IDs", dest="get_hal_id"
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="display DEBUG level messages"
@@ -108,7 +117,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "in_path",
         help="path to CSV file listing papers. Each paper must have a DOI or HAL ID. Use"
-        + "txt2csv.py if you need to look up DOIs for a list of references.",
+        + " txt2csv.py if you need to look up DOIs for a list of references.",
     )
     parser.add_argument(
         "out_path",

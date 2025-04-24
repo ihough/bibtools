@@ -33,6 +33,9 @@ PAPER_TO_SHEET = {
     "author": "First Author",
     "year": "Year",
     "journal": "Journal",
+    "volume": "Volume",
+    "issue": "Issue",
+    "page": "Page",
     "orcid": "First Author ORCID",
     "abstract": "Abstract",
 }
@@ -161,7 +164,8 @@ class Reference(Requester):
         # https://www.crossref.org/documentation/retrieve-metadata/rest-api/tips-for-using-the-crossref-rest-api/
         url = (
             f'https://api.crossref.org/works?query.bibliographic="{self.encode_text()}"'
-            + "&rows=2&select=score,DOI,author,issued,title,container-title,type"
+            + "&rows=2&select=score,DOI,author,issued,title,container-title,volume,issue"
+            + ",page,type"
         )
         response = self.get(url, timeout=20)
 
@@ -232,6 +236,9 @@ class Reference(Requester):
         if journal is not None:
             journal = journal.replace("&amp;", "&")
         self.journal = journal
+        self.volume = match.get("volume")
+        self.issue = match.get("issue")
+        self.page = match.get("page")
         self.score = scores[0]
 
 
@@ -253,6 +260,9 @@ class Paper(Requester):
         note: Additional information (default: None)
         title: The paper's title (default: None)
         journal: The paper's journal (default: None)
+        volume: The paper's journal volume (default: None)
+        issue: The paper's journal issue (default: None)
+        page: The paper's journal page number (default: None)
         orcid: The first author's ORCID (default: None)
         abstract: The paper's abstract (default: None)
     """
@@ -263,6 +273,9 @@ class Paper(Requester):
     year: int | None = None
     title: str | None = field(default=None, repr=False)
     journal: str | None = field(default=None, repr=False)
+    volume: str | None = field(default=None, repr=False)
+    issue: str | None = field(default=None, repr=False)
+    page: str | None = field(default=None, repr=False)
     abstract: str | None = field(default=None, repr=False)
     orcid: str | None = field(default=None, repr=False)
 
@@ -442,8 +455,13 @@ class Paper(Requester):
             details["author"] = ", ".join([author["family"], author["given"]])
             if author.get("ORCID") is not None:
                 details["orcid"] = author.get("ORCID")
-        if any(data.get("container-title", [])):
+        try:
             details["journal"] = data["container-title"][0]
+        except IndexError as err:
+            pass
+        details["volume"] = data.get("volume")
+        details["issue"] = data.get("issue")
+        details["page"] = data.get("page")
         abstract = data.get("abstract")
         if abstract is not None:
             details["abstract"] = re.sub(r"\s+", " ", abstract).strip()
@@ -497,7 +515,7 @@ class Paper(Requester):
         url = (
             f"https://api.archives-ouvertes.fr/search/?q={query}&fl=doiId_s,halId_s"
             + ",authFirstName_s,authLastName_s,producedDateY_i,title_s,journalTitle_s"
-            + ",abstract_s"
+            + ",volume_s,issue_s,page_s,abstract_s"
         )
         response = self.get(url)
 
@@ -522,8 +540,10 @@ class Paper(Requester):
             "title": data["title_s"][0],
             "year": data["producedDateY_i"],
         }
-        if data.get("journalTitle_s") is not None:
-            details["journal"] = data["journalTitle_s"]
+        details["journal"] = data.get("journalTitle_s")
+        details["volume"] = data.get("volume_s")
+        details["issue"] = data.get("issue_s")
+        details["page"] = data.get("page_s")
         abstract = data.get("abstract_s", [None])[0]
         if abstract is not None:
             details["abstract"] = re.sub(r"\s+", " ", abstract)
@@ -605,6 +625,11 @@ class Paper(Requester):
         self.title = info.get("title")
         self.year = info.get("year")
         self.journal = info.get("journal")
+        if self.journal is not None:
+            self.journal = self.journal.replace("&amp;", "&")
+        self.volume = info.get("volume")
+        self.issue = info.get("issue")
+        self.page = info.get("page")
         self.abstract = info.get("abstract")
 
     def parse_hal_id(self, hal_id: str) -> str | None:
