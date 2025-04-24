@@ -450,7 +450,7 @@ class Paper(Requester):
             "title": re.sub(r"\s+", " ", data["title"][0]).strip(),
             "year": data["issued"]["date-parts"][0][0],
         }
-        if any(data.get("author", [])):
+        if "author" in data:
             author = data["author"][0]
             details["author"] = ", ".join([author["family"], author["given"]])
             if author.get("ORCID") is not None:
@@ -534,7 +534,7 @@ class Paper(Requester):
         data = data["docs"][0]
         author = ", ".join([data["authLastName_s"][0], data["authFirstName_s"][0]])
         details = {
-            "doi": data.get("doiId_s", "no doi"),
+            "doi": data.get("doiId_s", "no doi").lower(),
             "hal_id": data["halId_s"],
             "author": author,
             "title": data["title_s"][0],
@@ -589,13 +589,13 @@ class Paper(Requester):
             # Set DOI if it is missing and was found on HAL
             # Warn and don't overwrite existing DOI if HAL-provided DOI differs
             if "doi" in info:
-                if self.has_doi() and self.doi != info["doi"]:
-                    warn(
-                        f"Paper {self} has DOI {self.doi} but HAL returned DOI"
-                        f" {info['doi']}. Please check DOI and HAL ID."
-                    )
-                else:
+                if not self.has_doi():
                     self.doi = info["doi"]
+                elif info["doi"] != "no doi" and info["doi"] != self.doi:
+                    warn(
+                        f"HAL returned DOI {info['doi']} for Paper(doi='{self.doi}'" +
+                        f", hal_id='{self.hal_id}'). Please check DOI and HAL ID."
+                    )
 
         # If paper has a DOI, look up details from Crossref (and other sources)
         # Do this even if paper is on HAL b/c Crossref metadata is often more complete
@@ -800,7 +800,8 @@ def get_sheet_papers() -> list[Paper]:
         except ValueError as err:
             raise ValueError(f"Could not parse paper from row {i + 3}: {record}") from err
 
-        # Merge duplicates
+        # Merge duplicates. Duplicates may remain if a paper was listed once with only DOI
+        # and again with only HAL ID.
         if paper.doi in dois or paper.hal_id in hal_ids:
             # Find the previous occurence of the paper and update the lister
             try:
@@ -925,26 +926,30 @@ def parse_doi(doi: str, raise_on_fail: bool = False) -> str | None:
 
     Recognized DOI formats:
         - <DOI>
-        - http[s]://[dx.]doi.org/<DOI>
-        - http[s]://doi-org.<subdomain>.grenet.fr/<DOI>
-        - http[s]://<domain and path>/doi/[full/]/<DOI>
+        - doi:<DOI>
+        - [http[s]://][dx.]doi.org/<DOI>
+        - [http[s]://]doi-org.<subdomain>.grenet.fr/<DOI>
+        - [http[s]://]<domain and path>/doi/[full/]/<DOI>
         - 'no doi'
     """
 
     if doi is None or doi.strip() == "":
         return None
     doi = doi.lower().strip()
+    doi = re.sub("^https?://", "", doi)
 
     doi_pattern = r"(10\.\d{4}.+)"
     patterns = [
         # <DOI>
         r"^" + doi_pattern,
+        # doi:<DOI>
+        r"^doi:" + doi_pattern,
         # [dx.]doi.org/<DOI>
-        r"^https?:\/\/(?:dx\.)?doi\.org\/" + doi_pattern,
+        r"^(?:dx\.)?doi\.org\/" + doi_pattern,
         # doi-org.*.grenet.fr/<DOI>
-        r"^https?:\/\/doi-org\.[\w-]+\.grenet\.fr\/" + doi_pattern,
-        # */doi/[full/]/<DOI>
-        r"^https?:\/\/[\w\.]+\/doi\/(?:full\/)" + doi_pattern,
+        r"^doi-org\.[\w-]+\.grenet\.fr\/" + doi_pattern,
+        # */doi/[full/]<DOI>
+        r"^[\w\.]+\/doi\/(?:full\/)?" + doi_pattern,
         # No DOI indicator
         r"^(no doi)$",
     ]
