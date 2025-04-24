@@ -880,7 +880,7 @@ def papers_to_wordclouds(
             fields = [fields]
 
         # Check output path
-        out_path = Path(f"wordcloud_{'+'.join(fields)}{suffix}.png")
+        out_path = Path(f"wordcloud_{'s+'.join(fields)}s{suffix}.png")
         if out_path.exists() and not force:
             raise ValueError(f"File exists: {out_path}. Use --force to overwrite")
 
